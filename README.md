@@ -22,6 +22,10 @@ claw-skills/
 ├── stepfun-asr/                     # StepFun Speech Recognition skill
 │   ├── SKILL.md
 │   └── stepfun_asr.py
+├── stepfun-voice-cloning/            # Skill: Clone voices from reference audio
+│   ├── SKILL.md
+│   └── stepfun_voice.py
+
 └── tests/                           # Unit tests for all skills
     ├── test_stepfun_image.py
     ├── test_stepfun_tts.py
@@ -38,7 +42,56 @@ pytest tests/ -v
 pytest tests/test_stepfun_image.py -v
 pytest tests/test_stepfun_tts.py -v
 pytest tests/test_stepfun_asr.py -v
+pytest tests/test_stepfun_voice.py -v
+
 ```
+
+## Live Integration Tests
+
+The repository also includes **live integration tests** that make real API calls to
+StepFun and consume plan credits. These are marked with `@pytest.mark.integration` and
+are **skipped by default**.
+
+**⚠️ Cost warning:** Each live test makes 1–2 API calls (image generation, TTS, ASR, or
+image edit). Estimated cost per full run: ~$0.01–$0.05 USD equivalent in StepFun plan
+credits. A banner is printed to stderr when integration tests are loaded with the API
+key present.
+
+### Running live tests
+
+```bash
+# Run only live integration tests
+pytest tests/ -v -m integration
+
+# Run all tests including live ones
+pytest tests/ -v
+```
+
+### Running unit tests only (skipping live tests)
+
+```bash
+pytest tests/ -v -k "not Integration"
+```
+
+### Requirements
+
+- `STEP_FUN_API_KEY` environment variable must be set (live tests are auto-skipped if missing)
+- Internet connectivity to `api.stepfun.ai`
+- Active StepFun plan with available credits
+
+### What's tested
+
+| Test | Verifies |
+|---|---|
+| `test_live_image_generation` | PNG output, valid signature, size > 0 < 50MB |
+| `test_live_image_edit` | Edit from a generated base image, valid PNG output |
+| `test_live_tts_mp3` | MP3 output, valid header, size > 1KB |
+| `test_live_tts_wav_format` | WAV output format works correctly |
+| `test_live_roundtrip_tts_asr` | TTS → ASR text match ≥ 80% fuzzy similarity |
+| `test_live_roundtrip_tts_asr_short_text` | Short phrase roundtrip ≥ 70% similarity |
+
+Text matching uses fuzzy comparison (`difflib.SequenceMatcher`) because TTS/ASR
+roundtrips may vary in punctuation, casing, or minor word differences.
 
 ## Script Conventions
 
@@ -63,6 +116,8 @@ zeroclaw skills install /path/to/claw-skills/stepfun-image-generation
 zeroclaw skills install /path/to/claw-skills/stepfun-image-edit
 zeroclaw skills install /path/to/claw-skills/stepfun-tts
 zeroclaw skills install /path/to/claw-skills/stepfun-asr
+zeroclaw skills install /path/to/claw-skills/stepfun-voice-cloning
+
 ```
 
 ## Environment Variables

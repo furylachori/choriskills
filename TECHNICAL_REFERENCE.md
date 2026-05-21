@@ -9,12 +9,16 @@ This document contains the full API details for agent implementation and debuggi
 | `https://api.stepfun.ai/v1` | Open platform (budget credits, no billing plan required) |
 | `https://api.stepfun.ai/step_plan/v1` | Step Plan billing (V0-V5 tiers) |
 
-**Which to use:** The scripts in this repo use `step_plan/v1` (plan credits). If you have a Step Plan subscription, use that base. For open platform access without a plan, use `/v1` (set `STEPFUN_API_BASE` env var).
+**Which to use:**
+- Most audio endpoints (`audio/asr/sse`, `audio/speech`, `audio/voices`, etc.) use `step_plan/v1` for plan credits.
+- The `files` endpoint uses `/v1` (open platform base), not `step_plan/v1`. The code in `stepfun_voice.py` handles this automatically.
+- For open platform access without a Step Plan, set `STEPFUN_API_BASE=https://api.stepfun.ai/v1`.
 
 ## Endpoints
 
 | Feature | Endpoint | Method | Auth |
 |---|---|---|---|
+| Upload File | `/v1/files` | POST (multipart) | Bearer |
 | Image Generate | `/images/generations` | POST | Bearer |
 | Image Edit | `/images/edits` | POST (multipart) | Bearer |
 | Text-to-Speech | `/audio/speech` | POST | Bearer |

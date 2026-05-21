@@ -26,6 +26,7 @@ from datetime import datetime
 
 ALLOWED_SCHEMES = {"https"}
 ALLOWED_HOSTS = {"api.stepfun.ai"}
+ALLOWED_HOST_SUFFIXES = {".aliyuncs.com"}  # Alibaba Cloud OSS (StepFun image/audio hosting)
 MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
 HTTP_TIMEOUT = 60
 
@@ -64,8 +65,12 @@ def validate_url_safe(url):
     if parsed.scheme not in ALLOWED_SCHEMES:
         print(f"Error: URL scheme '{parsed.scheme}' is not allowed. Only https:// is permitted.", file=sys.stderr)
         sys.exit(1)
-    if parsed.hostname not in ALLOWED_HOSTS:
-        print(f"Error: URL hostname '{parsed.hostname}' is not allowed.", file=sys.stderr)
+    hostname = parsed.hostname
+    if not hostname:
+        print(f"Error: URL has no hostname.", file=sys.stderr)
+        sys.exit(1)
+    if hostname not in ALLOWED_HOSTS and not any(hostname.endswith(suffix) for suffix in ALLOWED_HOST_SUFFIXES):
+        print(f"Error: URL hostname '{hostname}' is not allowed.", file=sys.stderr)
         sys.exit(1)
 
 
