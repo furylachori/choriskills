@@ -276,6 +276,114 @@ class TestLiveTTS(unittest.TestCase):
             # limitation, not a test bug. WAV output would require non-streaming
             # response handling which is not currently available.
 
+    def test_live_tts_return_url(self):
+        """Test TTS with return_url=True - exercises JSON response + download path."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setenv("OUTPUT_DIR", tmpdir)
+                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+
+                args = MagicMock()
+                args.text = "Testing the return URL feature."
+                args.voice = "lively-girl"
+                args.format = "mp3"
+                args.instruction = None
+                args.verbose = False
+                args.speed = 1.0
+                args.volume = 1.0
+                args.sample_rate = 24000
+                args.return_url = True          # KEY: test JSON response path
+                args.voice_label = None
+                args.pronunciation_map = None
+                args.stream_format = "audio"
+                args.markdown_filter = False
+
+                output_path = stepfun_tts.text_to_speech(args)
+
+                # Verify downloaded file exists and is valid MP3
+                self.assertTrue(os.path.exists(output_path),
+                    f"Downloaded audio not created: {output_path}")
+                size = os.path.getsize(output_path)
+                self.assertGreater(size, 1024,
+                    f"Downloaded audio is suspiciously small: {size} bytes")
+                with open(output_path, "rb") as f:
+                    header = f.read(3)
+                is_id3 = header == b"ID3"
+                is_mpeg_sync = header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
+                self.assertTrue(is_id3 or is_mpeg_sync,
+                    f"Downloaded file does not appear to be valid MP3. Header: {header!r}")
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.environ.get("STEP_FUN_API_KEY"),
+    reason="STEP_FUN_API_KEY environment variable is required"
+)
+class TestLiveASR(unittest.TestCase):
+    """Test real speech recognition against the StepFun API."""
+
+    def test_live_asr_transcription(self):
+        """Transcribe a real audio file and verify output."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setenv("OUTPUT_DIR", tmpdir)
+                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+
+                # Create a real WAV file with actual speech-like audio
+                audio_path = os.path.join(tmpdir, "test_speech.wav")
+                sample_rate = 16000
+                duration_sec = 1.0
+                num_samples = int(sample_rate * duration_sec)
+                data = b""
+                for i in range(num_samples):
+                    # Generate a sine wave at ~440Hz (musical note A)
+                    import math
+                    val = int(32767 * 0.3 * math.sin(2 * math.pi * 440 * i / sample_rate))
+                    data += struct.pack('<h', val)
+
+                byte_rate = sample_rate * 2
+                data_size = len(data)
+                header = (
+                    b"RIFF"
+                    + struct.pack('<I', 36 + data_size)
+                    + b"WAVE"
+                    + b"fmt "
+                    + struct.pack('<I', 16)
+                    + struct.pack('<H', 1)   # PCM
+                    + struct.pack('<H', 1)   # mono
+                    + struct.pack('<I', sample_rate)
+                    + struct.pack('<I', byte_rate)
+                    + struct.pack('<H', 2)   # 16-bit
+                    + struct.pack('<H', 16)
+                    + b"data"
+                    + struct.pack('<I', data_size)
+                )
+                with open(audio_path, "wb") as f:
+                    f.write(header + data)
+
+                args = MagicMock()
+                args.audio = audio_path
+                args.language = "en"
+                args.format = None
+                args.verbose = False
+                args.hotwords = None
+                args.hotwords_list = None
+                args.prompt = None
+
+                output_path, transcript = stepfun_asr.transcribe_audio(args)
+
+                # Verify transcript file was created
+                self.assertTrue(os.path.exists(output_path),
+                    f"Transcript not created: {output_path}")
+                self.assertIn("asr_transcript_", output_path)
+
+                # Read back the transcript
+                with open(output_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                self.assertTrue(len(content) > 0, "Transcript is empty")
+                # The transcript text should also be returned
+                self.assertIsInstance(transcript, str)
+
 
 if __name__ == "__main__":
     # Allow running directly: python tests/test_live_integration.py
