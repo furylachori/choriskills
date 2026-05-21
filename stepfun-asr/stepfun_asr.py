@@ -45,8 +45,58 @@ API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v
 API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
 
 
+def validate_api_base():
+    """Validate STEPFUN_API_BASE environment variable."""
+    from urllib.parse import urlparse
+    base = os.environ.get("STEPFUN_API_BASE", "")
+    if not base:
+        return  # Will use default
+    parsed = urlparse(base)
+    if parsed.scheme != "https":
+        print(f"Error: STEPFUN_API_BASE must use https scheme, got '{parsed.scheme}'", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
+    hostname = parsed.hostname
+    if not hostname or (hostname != "api.stepfun.ai" and not hostname.endswith(".aliyuncs.com")):
+        print(f"Error: STEPFUN_API_BASE hostname '{hostname}' is not allowed. Must be api.stepfun.ai or *.aliyuncs.com", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
+
+
+validate_api_base()
+
+# Exit codes for agent programmatic handling
+EXIT_OK = 0
+EXIT_INPUT_ERROR = 2      # Bad arguments, file not found, validation failures
+EXIT_AUTH_ERROR = 3       # Missing/invalid API key
+EXIT_RATE_LIMIT = 4       # 429 rate limited
+EXIT_NETWORK_ERROR = 5    # Connection failures
+EXIT_API_ERROR = 6        # API returned error (400, 500, etc.)
+EXIT_FILE_ERROR = 7       # Disk full, permission denied, I/O failures
+
+
+def validate_output_dir():
+    """Validate OUTPUT_DIR environment variable for path traversal."""
+    output_dir = os.environ.get("OUTPUT_DIR", "")
+    if not output_dir:
+        return  # Will use default
+
+    # Resolve to real path
+    real_path = os.path.realpath(output_dir)
+
+    # Check for path traversal
+    if '..' in output_dir.replace('\\', '/').split('/'):
+        print(f"Error: OUTPUT_DIR contains '..' which is not allowed.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    # Check it's not a system directory
+    forbidden_prefixes = ('/etc', '/sys', '/proc', '/dev', '/boot')
+    if real_path.startswith(forbidden_prefixes):
+        print(f"Error: OUTPUT_DIR points to a system directory.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+
 def get_output_dir():
     """Get OUTPUT_DIR from environment or use default."""
+    validate_output_dir()
     return os.environ.get("OUTPUT_DIR", os.path.expanduser("~/.zeroclaw/workspace/output"))
 
 
@@ -64,18 +114,18 @@ def transcribe_audio(args):
     api_key = os.environ.get("STEP_FUN_API_KEY", "")
     if not api_key:
         print("Error: STEP_FUN_API_KEY environment variable is not set.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_AUTH_ERROR)
 
     if not os.path.exists(args.audio):
         print(f"Error: Audio file '{args.audio}' does not exist.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
     # Validate no path traversal in audio path
     normalized = args.audio.replace('\\', '/')
     parts = normalized.split('/')
     if '..' in parts:
         print(f"Error: Audio path contains '..' which is not allowed.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
     # Read audio file and encode to base64
     try:
@@ -83,11 +133,11 @@ def transcribe_audio(args):
             audio_data = f.read()
     except OSError as e:
         print(f"Error: Could not read audio file '{args.audio}': {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_FILE_ERROR)
     
     if len(audio_data) > MAX_RESPONSE_SIZE:
         print(f"Error: Audio file too large ({len(audio_data)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
     
     audio_base64 = base64.b64encode(audio_data).decode('utf-8')
     
@@ -216,10 +266,13 @@ def transcribe_audio(args):
                 os.unlink(tmp_path)
             except OSError:
                 pass
-            sys.exit(1)
+            sys.exit(EXIT_FILE_ERROR)
         
         print(f"Transcript: {output_path}")
-        print(full_text)
+        if args.print_transcript:
+            print(full_text)
+        elif args.verbose:
+            print(full_text, file=sys.stderr)
         
         if args.verbose and final_usage:
             print(f"Usage: {final_usage}", file=sys.stderr)
@@ -234,10 +287,10 @@ def transcribe_audio(args):
         except json.JSONDecodeError:
             error_msg = error_body
         print(f"ASR API Error ({e.code}): {error_msg}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_API_ERROR)
     except urllib.error.URLError as e:
         print(f"ASR API Error: {e.reason}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_NETWORK_ERROR)
 
 
 def main():
@@ -247,6 +300,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Print usage metadata to stderr")
     parser.add_argument("--format", default=None, help="Audio format override (mp3, wav, etc.)")
     parser.add_argument("--hotwords", default=None, help="Comma-separated hotwords to boost recognition (e.g., 'AI,zeroclaw,API')")
+    parser.add_argument("--print-transcript", action="store_true", help="Print transcript text to stdout (default: metadata only to stderr)")
     parser.add_argument("--prompt", default=None, help="Context prompt for pro model")
 
     args = parser.parse_args()

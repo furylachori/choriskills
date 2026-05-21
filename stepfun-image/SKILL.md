@@ -53,6 +53,35 @@ Square: `1024x1024` | Portrait: `768x1360`, `896x1184` | Landscape: `1360x768`, 
 - PNG or JPEG format
 - Pass the file path with `--input`
 
+## All Parameters
+
+| Parameter | Default | Range/Choices | Description |
+|---|---|---|---|
+| `generate --prompt` | (required) | 1–512 chars | Text description of the image |
+| `edit --prompt` | (required) | 1–512 chars | Edit description |
+| `generate --model` | `step-image-edit-2` | — | Model name |
+| `edit --model` | `step-image-edit-2` | — | Model name |
+| `--size` | `1024x1024` | 1024x1024, 768x1360, 896x1184, 1360x768, 1184x896 | Output dimensions (ignored for edit) |
+| `--steps` | `8` | 1–50 | Inference steps (higher = slower, better quality) |
+| `--cfg-scale` | `1.0` | 0.1–10.0 | Classifier-free guidance scale |
+| `--seed` | random | any int | Random seed for reproducibility |
+| `--text-mode` | false | flag | Enable text rendering in image |
+| `--negative-prompt` | `""` | free text | Features to exclude |
+| `--verbose` | false | flag | Print metadata to stderr |
+
+## Environment Setup
+
+Before running, set the required environment variable:
+
+```bash
+export STEP_FUN_API_KEY="your-api-key-here"
+```
+
+Or create a `.env` file in the skill directory:
+```
+STEP_FUN_API_KEY=your-api-key-here
+```
+
 ## Output
 
 ```
@@ -63,6 +92,7 @@ The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/workspace/output`). No
 
 ## Troubleshooting
 
+- **"--size is ignored for edit"** — The edit API accepts but ignores the size parameter; output dimensions are determined by the API
 - **"Prompt must be 1–512 characters"** — shorten your prompt
 - **"API key not set"** — add `STEP_FUN_API_KEY` to your environment
 - **"Input file does not exist"** — check the `--input` path
@@ -71,4 +101,4 @@ The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/workspace/output`). No
 
 ## Technical Reference
 
-Full API parameters and response formats: [TECHNICAL_REFERENCE.md](./TECHNICAL_REFERENCE.md)
+Full API parameters and response formats: [TECHNICAL_REFERENCE.md](../TECHNICAL_REFERENCE.md)

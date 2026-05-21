@@ -30,12 +30,62 @@ ALLOWED_HOST_SUFFIXES = {".aliyuncs.com"}  # Alibaba Cloud OSS (StepFun image/au
 MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
 HTTP_TIMEOUT = 60
 
+# Exit codes for agent programmatic handling
+EXIT_OK = 0
+EXIT_INPUT_ERROR = 2      # Bad arguments, file not found, validation failures
+EXIT_AUTH_ERROR = 3       # Missing/invalid API key
+EXIT_RATE_LIMIT = 4       # 429 rate limited
+EXIT_NETWORK_ERROR = 5    # Connection failures
+EXIT_API_ERROR = 6        # API returned error (400, 500, etc.)
+EXIT_FILE_ERROR = 7       # Disk full, permission denied, I/O failures
+
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
 API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
 
 
+def validate_api_base():
+    """Validate STEPFUN_API_BASE environment variable."""
+    from urllib.parse import urlparse
+    base = os.environ.get("STEPFUN_API_BASE", "")
+    if not base:
+        return  # Will use default
+    parsed = urlparse(base)
+    if parsed.scheme != "https":
+        print(f"Error: STEPFUN_API_BASE must use https scheme, got '{parsed.scheme}'", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
+    hostname = parsed.hostname
+    if not hostname or (hostname != "api.stepfun.ai" and not hostname.endswith(".aliyuncs.com")):
+        print(f"Error: STEPFUN_API_BASE hostname '{hostname}' is not allowed. Must be api.stepfun.ai or *.aliyuncs.com", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
+
+
+validate_api_base()
+
+
+def validate_output_dir():
+    """Validate OUTPUT_DIR environment variable for path traversal."""
+    output_dir = os.environ.get("OUTPUT_DIR", "")
+    if not output_dir:
+        return  # Will use default
+
+    # Resolve to real path
+    real_path = os.path.realpath(output_dir)
+
+    # Check for path traversal
+    if '..' in output_dir.replace('\\', '/').split('/'):
+        print(f"Error: OUTPUT_DIR contains '..' which is not allowed.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    # Check it's not a system directory
+    forbidden_prefixes = ('/etc', '/sys', '/proc', '/dev', '/boot')
+    if real_path.startswith(forbidden_prefixes):
+        print(f"Error: OUTPUT_DIR points to a system directory.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+
 def get_output_dir():
     """Get OUTPUT_DIR from environment or use default."""
+    validate_output_dir()
     return os.environ.get("OUTPUT_DIR", os.path.expanduser("~/.zeroclaw/workspace/output"))
 
 
@@ -64,14 +114,14 @@ def validate_url_safe(url):
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
         print(f"Error: URL scheme '{parsed.scheme}' is not allowed. Only https:// is permitted.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
     hostname = parsed.hostname
     if not hostname:
         print(f"Error: URL has no hostname.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
     if hostname not in ALLOWED_HOSTS and not any(hostname.endswith(suffix) for suffix in ALLOWED_HOST_SUFFIXES):
         print(f"Error: URL hostname '{hostname}' is not allowed.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
 
 def download_url(url, output_path):
@@ -104,23 +154,23 @@ def download_url(url, output_path):
                         if total > MAX_RESPONSE_SIZE:
                             os.unlink(tmp_path)
                             print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
-                            sys.exit(1)
+                            sys.exit(EXIT_INPUT_ERROR)
                         f.write(chunk)
             except OSError as e:
                 print(f"Error writing to temporary file '{tmp_path}': {e}", file=sys.stderr)
-                sys.exit(1)
+                sys.exit(EXIT_FILE_ERROR)
 
             try:
                 os.replace(tmp_path, output_path)
             except OSError as e:
                 print(f"Error moving temporary file to '{output_path}': {e}", file=sys.stderr)
-                sys.exit(1)
+                sys.exit(EXIT_FILE_ERROR)
     except urllib.error.HTTPError as e:
         print(f"Error downloading from URL: HTTP {e.code}", file=sys.stderr)
         sys.exit(1)
     except urllib.error.URLError as e:
         print(f"Error downloading from URL: {e.reason}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_NETWORK_ERROR)
 
 
 def filter_markdown(text):
@@ -152,31 +202,31 @@ def text_to_speech(args):
     api_key = os.environ.get("STEP_FUN_API_KEY", "")
     if not api_key:
         print("Error: STEP_FUN_API_KEY environment variable is not set.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_AUTH_ERROR)
 
     if not args.text or len(args.text) < 1 or len(args.text) > 1000:
         print(f"Error: Text must be 1-1000 characters (got {len(args.text) if args.text else 0}).", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
     # Validate ranges
     if args.speed < 0.5 or args.speed > 2.0:
         print(f"Error: Speed must be between 0.5 and 2.0 (got {args.speed}).", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
     if args.volume < 0.0 or args.volume > 2.0:
         print(f"Error: Volume must be between 0.0 and 2.0 (got {args.volume}).", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
     if args.sample_rate <= 0:
         print(f"Error: Sample rate must be a positive integer (got {args.sample_rate}).", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
     text = args.text
     if args.markdown_filter:
         text = filter_markdown(text)
         if not text or len(text) > 1000:
             print(f"Error: Filtered text must be 1-1000 characters.", file=sys.stderr)
-            sys.exit(1)
+            sys.exit(EXIT_INPUT_ERROR)
 
     output_path = get_output_path(args.voice, args.format)
 
@@ -189,7 +239,6 @@ def text_to_speech(args):
         "speed": args.speed,
         "volume": args.volume,
         "sample_rate": args.sample_rate,
-        "markdown_filter": args.markdown_filter
     }
 
     # stream_format is mutually exclusive with return_url
@@ -208,7 +257,7 @@ def text_to_speech(args):
             data["pronunciation_map"] = pronunciation_map
         except json.JSONDecodeError:
             print(f"Error: --pronunciation-map must be a valid JSON string.", file=sys.stderr)
-            sys.exit(1)
+            sys.exit(EXIT_INPUT_ERROR)
 
     url = f"{API_URL}/audio/speech"
     headers = {
@@ -236,7 +285,7 @@ def text_to_speech(args):
                 
                 if len(audio_data) > MAX_RESPONSE_SIZE:
                     print(f"Error: Audio data too large ({len(audio_data)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
-                    sys.exit(1)
+                    sys.exit(EXIT_INPUT_ERROR)
                 
                 tmp_path = output_path + ".tmp"
                 try:
@@ -244,12 +293,12 @@ def text_to_speech(args):
                         f.write(audio_data)
                 except OSError as e:
                     print(f"Error writing audio to temporary file '{tmp_path}': {e}", file=sys.stderr)
-                    sys.exit(1)
+                    sys.exit(EXIT_FILE_ERROR)
                 try:
                     os.replace(tmp_path, output_path)
                 except OSError as e:
                     print(f"Error moving temporary file to '{output_path}': {e}", file=sys.stderr)
-                    sys.exit(1)
+                    sys.exit(EXIT_FILE_ERROR)
             
             print(f"Audio generated: {output_path}")
             if args.verbose:
@@ -266,10 +315,10 @@ def text_to_speech(args):
         except json.JSONDecodeError:
             error_msg = error_body
         print(f"TTS API Error ({e.code}): {error_msg}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_API_ERROR)
     except urllib.error.URLError as e:
         print(f"TTS API Error: {e.reason}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_NETWORK_ERROR)
 
 
 def main():

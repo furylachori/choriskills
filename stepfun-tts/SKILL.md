@@ -40,10 +40,23 @@ Use `--instruction` to guide the delivery style:
 python stepfun_tts.py --text "Welcome to Desampa" --voice elegantgentle-female --instruction "warm and welcoming"
 ```
 
-### Optional tweaks
+## All Parameters
 
-- `--format mp3` — audio format (mp3, wav, flac, opus, pcm)
-- `--instruction "happy, upbeat"` — emotion/style
+| Parameter | Default | Range/Choices | Description |
+|---|---|---|---|
+| `--text` | (required) | 1–1000 chars | Text to speak |
+| `--voice` | `lively-girl` | 40+ voice IDs | Voice to use |
+| `--format` | `mp3` | mp3, wav, flac, opus, pcm | Output audio format |
+| `--instruction` | none | free text | Emotion/style guidance |
+| `--speed` | `1.0` | 0.5–2.0 | Playback speed multiplier |
+| `--volume` | `1.0` | 0.0–2.0 | Volume gain |
+| `--sample-rate` | `24000` | positive int | Output sample rate in Hz |
+| `--return-url` | false | flag | Return signed URL instead of binary audio |
+| `--stream-format` | `audio` | audio, sse | Stream chunk format |
+| `--voice-label` | none | free text | Pronunciation guidance label |
+| `--pronunciation-map` | none | JSON string | Phonetic overrides |
+| `--markdown-filter` | false | flag | Strip markdown syntax before synthesis |
+| `--verbose` | false | flag | Print metadata to stderr |
 
 ## What You'll See
 
@@ -53,11 +66,27 @@ Audio generated: /Users/dastua/.zeroclaw/workspace/output/tts_lively_girl_202506
 
 Saved automatically to `$OUTPUT_DIR` as MP3.
 
+## Environment Setup
+
+Before running, set the required environment variable:
+
+```bash
+export STEP_FUN_API_KEY="your-api-key-here"
+```
+
+Or create a `.env` file in the skill directory:
+```
+STEP_FUN_API_KEY=your-api-key-here
+```
+
 ## Troubleshooting
 
 - **"Text must be 1–1000 characters"** — shorten or split your text
 - **"API key not set"** — add `STEP_FUN_API_KEY` to your environment
+- **"Speed must be between 0.5 and 2.0"** — check `--speed` value
+- **"Volume must be between 0.0 and 2.0"** — check `--volume` value
+- **"pronunciation-map must be a valid JSON string"** — verify JSON syntax
 
 ## Technical Reference
 
-Full API parameters and response formats: [TECHNICAL_REFERENCE.md](../TECHNICAL_REFERENCE.md)
+Full API parameters, response formats, and error codes: [TECHNICAL_REFERENCE.md](../TECHNICAL_REFERENCE.md)

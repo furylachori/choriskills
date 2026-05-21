@@ -42,8 +42,58 @@ API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v
 API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
 
 
+def validate_api_base():
+    """Validate STEPFUN_API_BASE environment variable."""
+    from urllib.parse import urlparse
+    base = os.environ.get("STEPFUN_API_BASE", "")
+    if not base:
+        return  # Will use default
+    parsed = urlparse(base)
+    if parsed.scheme != "https":
+        print(f"Error: STEPFUN_API_BASE must use https scheme, got '{parsed.scheme}'", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
+    hostname = parsed.hostname
+    if not hostname or (hostname != "api.stepfun.ai" and not hostname.endswith(".aliyuncs.com")):
+        print(f"Error: STEPFUN_API_BASE hostname '{hostname}' is not allowed. Must be api.stepfun.ai or *.aliyuncs.com", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
+
+
+validate_api_base()
+
+# Exit codes for agent programmatic handling
+EXIT_OK = 0
+EXIT_INPUT_ERROR = 2      # Bad arguments, file not found, validation failures
+EXIT_AUTH_ERROR = 3       # Missing/invalid API key
+EXIT_RATE_LIMIT = 4       # 429 rate limited
+EXIT_NETWORK_ERROR = 5    # Connection failures
+EXIT_API_ERROR = 6        # API returned error (400, 500, etc.)
+EXIT_FILE_ERROR = 7       # Disk full, permission denied, I/O failures
+
+
+def validate_output_dir():
+    """Validate OUTPUT_DIR environment variable for path traversal."""
+    output_dir = os.environ.get("OUTPUT_DIR", "")
+    if not output_dir:
+        return  # Will use default
+
+    # Resolve to real path
+    real_path = os.path.realpath(output_dir)
+
+    # Check for path traversal
+    if '..' in output_dir.replace('\\', '/').split('/'):
+        print(f"Error: OUTPUT_DIR contains '..' which is not allowed.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    # Check it's not a system directory
+    forbidden_prefixes = ('/etc', '/sys', '/proc', '/dev', '/boot')
+    if real_path.startswith(forbidden_prefixes):
+        print(f"Error: OUTPUT_DIR points to a system directory.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+
 def get_output_dir():
     """Get OUTPUT_DIR from environment or use default."""
+    validate_output_dir()
     return os.environ.get("OUTPUT_DIR", os.path.expanduser("~/.zeroclaw/workspace/output"))
 
 
@@ -71,24 +121,24 @@ def validate_size(size_str):
     """Validate --size format and allowed values."""
     if not SIZE_RE.match(size_str):
         print(f"Error: --size must be in WxH format (e.g. 1024x1024), got '{size_str}'", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
     if size_str not in ALLOWED_SIZES:
         print(f"Error: --size must be one of {sorted(ALLOWED_SIZES)}, got '{size_str}'", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
 
 def validate_steps(steps):
     """Validate --steps range."""
     if steps < 1 or steps > 50:
         print(f"Error: --steps must be 1-50, got {steps}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
 
 def validate_cfg_scale(cfg_scale):
     """Validate --cfg-scale range."""
     if cfg_scale < 0.1 or cfg_scale > 10.0:
         print(f"Error: --cfg-scale must be 0.1-10.0, got {cfg_scale}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
 
 def validate_url_safe(url):
@@ -97,14 +147,14 @@ def validate_url_safe(url):
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
         print(f"Error: URL scheme '{parsed.scheme}' is not allowed. Only https:// is permitted.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
     hostname = parsed.hostname
     if not hostname:
         print(f"Error: URL has no hostname.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
     if hostname not in ALLOWED_HOSTS and not any(hostname.endswith(suffix) for suffix in ALLOWED_HOST_SUFFIXES):
         print(f"Error: URL hostname '{hostname}' is not allowed.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
 
 def validate_input_path(input_path):
@@ -114,7 +164,7 @@ def validate_input_path(input_path):
     parts = normalized.split('/')
     if '..' in parts:
         print(f"Error: Input path contains '..' which is not allowed.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
 
 def download_url(url, output_path):
@@ -147,30 +197,30 @@ def download_url(url, output_path):
                         if total > MAX_RESPONSE_SIZE:
                             os.unlink(tmp_path)
                             print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
-                            sys.exit(1)
+                            sys.exit(EXIT_INPUT_ERROR)
                         f.write(chunk)
             except OSError as e:
                 print(f"Error writing to temporary file '{tmp_path}': {e}", file=sys.stderr)
-                sys.exit(1)
+                sys.exit(EXIT_FILE_ERROR)
             
             try:
                 os.replace(tmp_path, output_path)
             except OSError as e:
                 print(f"Error moving temporary file to '{output_path}': {e}", file=sys.stderr)
-                sys.exit(1)
+                sys.exit(EXIT_FILE_ERROR)
     except urllib.error.HTTPError as e:
         print(f"Error downloading from URL: HTTP {e.code}", file=sys.stderr)
         sys.exit(1)
     except urllib.error.URLError as e:
         print(f"Error downloading from URL: {e.reason}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_NETWORK_ERROR)
 
 
 def call_api(endpoint, data=None, files=None):
     """Make an API call to StepFun."""
     if not API_KEY:
         print("Error: STEP_FUN_API_KEY environment variable is not set.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_AUTH_ERROR)
 
     url = f"{API_URL}/{endpoint}"
     headers = {"Authorization": f"Bearer {API_KEY}"}
@@ -214,10 +264,10 @@ def call_api(endpoint, data=None, files=None):
         except json.JSONDecodeError:
             error_msg = error_body
         print(f"API Error ({e.code}): {error_msg}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_API_ERROR)
     except urllib.error.URLError as e:
         print(f"API Error: {e.reason}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_NETWORK_ERROR)
 
 
 def generate_image(args):
@@ -265,7 +315,7 @@ def generate_image(args):
     
     if len(image_bytes) > MAX_RESPONSE_SIZE:
         print(f"Error: Image data too large ({len(image_bytes)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
     
     tmp_path = args.output + ".tmp"
     try:
@@ -273,12 +323,12 @@ def generate_image(args):
             f.write(image_bytes)
     except OSError as e:
         print(f"Error writing image to temporary file '{tmp_path}': {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_FILE_ERROR)
     try:
         os.replace(tmp_path, args.output)
     except OSError as e:
         print(f"Error moving temporary file to '{args.output}': {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_FILE_ERROR)
     
     print(f"Image generated: {args.output}")
     if args.verbose and "seed" in image_data:
@@ -291,7 +341,10 @@ def edit_image(args):
     
     if not os.path.exists(args.input):
         print(f"Error: Input file '{args.input}' does not exist.", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if args.size:
+        print(f"Warning: --size is ignored for edit operations; output dimensions are determined by the API.", file=sys.stderr)
 
     args.output = get_output_path("edit", args.prompt)
     
@@ -375,7 +428,7 @@ def main():
     # Validate prompt length
     if len(args.prompt) < 1 or len(args.prompt) > 512:
         print(f"Error: Prompt must be 1-512 characters (got {len(args.prompt)})", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_INPUT_ERROR)
 
     if args.command == "generate":
         validate_steps(args.steps)
