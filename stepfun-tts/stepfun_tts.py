@@ -287,9 +287,9 @@ def main():
                         help="Voice label for pronunciation guidance")
     parser.add_argument("--pronunciation-map", default=None,
                         help="JSON string for pronunciation overrides (e.g., '{\"word\": \"phonetic\"}')")
-    parser.add_argument("--stream-format", default="pcm",
-                        choices=["pcm", "mp3", "wav", "flac"],
-                        help="Stream chunk format (default: pcm)")
+    parser.add_argument("--stream-format", default="audio",
+                        choices=["audio", "sse"],
+                        help="Stream chunk format (default: audio, options: audio or sse)")
     parser.add_argument("--markdown-filter", action="store_true", default=False,
                         help="Filter markdown syntax from input text")
 

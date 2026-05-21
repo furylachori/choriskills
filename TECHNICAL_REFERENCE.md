@@ -89,7 +89,7 @@ Note: Edit endpoint only returns `url`, not `b64_json`. Download from URL.
   "speed": 1.0,
   "volume": 1.0,
   "sample_rate": 24000,
-  "stream_format": "pcm"
+  "stream_format": "audio"
 }
 ```
 
@@ -105,7 +105,7 @@ Note: Edit endpoint only returns `url`, not `b64_json`. Download from URL.
 | `speed` | float | 1.0 | Playback speed multiplier (0.5-2.0) |
 | `volume` | float | 1.0 | Volume gain (0.0-2.0) |
 | `sample_rate` | int | 24000 | Output sample rate in Hz |
-| `stream_format` | string | `pcm` | Stream chunk format |
+| `stream_format` | string | `audio` | Stream chunk format (audio or sse) |
 
 > **Note:** `return_url=true` generates a temporary URL valid for **12 hours**. The URL is signed and expires after that window.
 
