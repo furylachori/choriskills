@@ -189,9 +189,12 @@ def text_to_speech(args):
         "speed": args.speed,
         "volume": args.volume,
         "sample_rate": args.sample_rate,
-        "stream_format": args.stream_format,
         "markdown_filter": args.markdown_filter
     }
+
+    # stream_format is mutually exclusive with return_url
+    if not args.return_url:
+        data["stream_format"] = args.stream_format
 
     if args.instruction:
         data["instruction"] = args.instruction
@@ -223,8 +226,10 @@ def text_to_speech(args):
                 result = json.loads(response.read().decode())
                 if 'url' in result:
                     download_url(result['url'], output_path)
+                elif 'data' in result and 'url' in result['data']:
+                    download_url(result['data']['url'], output_path)
                 else:
-                    print(f"Error: Unexpected JSON response: {result}", file=sys.stderr)
+                    print(f"Error: Expected URL in response but got neither 'url' nor 'data.url'. Response: {result}", file=sys.stderr)
                     sys.exit(1)
             else:
                 audio_data = response.read()

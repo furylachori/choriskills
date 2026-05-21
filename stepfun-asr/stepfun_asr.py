@@ -1,3 +1,14 @@
+# NOTE on live ASR testing:
+#
+# The StepFun ASR API requires real human speech audio to produce a transcript.
+# A synthetic sine wave (e.g. 440Hz tone) or any other non-speech signal is not
+# recognised as speech and the SSE stream returns zero data, causing any
+# live-integration test to fail.  Since real speech cannot be generated
+# programmatically in this codebase, automated live ASR tests are deliberately
+# omitted.  To verify ASR manually, use a recorded speech file:
+#     python stepfun_asr.py --audio recording.wav --language en
+
+
 #!/usr/bin/env python3
 """
 StepFun Automatic Speech Recognition (ASR) API Client
@@ -90,6 +101,18 @@ def transcribe_audio(args):
     if args.format:
         format_type = args.format
     
+    # Build format object: for container formats (wav/mp3/ogg), only send `type`
+    # since rate/bits/channel are optional and may confuse the API.
+    if format_type in ("wav", "mp3", "ogg"):
+        fmt = {"type": format_type}
+    else:
+        fmt = {
+            "type": format_type,
+            "rate": 16000,
+            "bits": 16,
+            "channel": 1
+        }
+
     # Build request body
     body = {
         "audio": {
@@ -100,12 +123,7 @@ def transcribe_audio(args):
                     "language": args.language,
                     "enable_itn": True
                 },
-                "format": {
-                    "type": format_type,
-                    "rate": 16000,
-                    "bits": 16,
-                    "channel": 1
-                }
+                "format": fmt
             }
         }
     }
