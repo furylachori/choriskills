@@ -55,13 +55,13 @@ class TestTextValidation(unittest.TestCase):
     def test_text_too_short(self):
         with self.assertRaises(SystemExit):
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
-                text_to_speech(MagicMock(text="", voice="lively-girl", format="mp3", instruction=None))
+                text_to_speech(MagicMock(text="", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
 
     def test_text_too_long(self):
         long_text = "a" * 1001
         with self.assertRaises(SystemExit):
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
-                text_to_speech(MagicMock(text=long_text, voice="lively-girl", format="mp3", instruction=None))
+                text_to_speech(MagicMock(text=long_text, voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
 
     def test_text_valid_length(self):
         """Test that valid text length passes validation."""
@@ -75,7 +75,7 @@ class TestTextValidation(unittest.TestCase):
                     mock_response.__exit__ = MagicMock(return_value=False)
                     mock_urlopen.return_value = mock_response
                     
-                    args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None)
+                    args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
                     text_to_speech(args)
 
     def test_text_boundary_1000(self):
@@ -90,7 +90,7 @@ class TestTextValidation(unittest.TestCase):
                     mock_response.__exit__ = MagicMock(return_value=False)
                     mock_urlopen.return_value = mock_response
                     
-                    args = MagicMock(text="a" * 1000, voice="lively-girl", format="mp3", instruction=None)
+                    args = MagicMock(text="a" * 1000, voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
                     text_to_speech(args)
 
     def test_text_boundary_1(self):
@@ -105,37 +105,7 @@ class TestTextValidation(unittest.TestCase):
                     mock_response.__exit__ = MagicMock(return_value=False)
                     mock_urlopen.return_value = mock_response
                     
-                    args = MagicMock(text="a", voice="lively-girl", format="mp3", instruction=None)
-                    text_to_speech(args)
-
-    def test_text_boundary_1000(self):
-        """Text exactly 1000 chars should pass."""
-        with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
-            with patch("stepfun_tts.get_output_path", return_value="/tmp/test.mp3"):
-                with patch("urllib.request.urlopen") as mock_urlopen:
-                    mock_response = MagicMock()
-                    mock_response.headers.get.return_value = "audio/mpeg"
-                    mock_response.read.return_value = b"fake audio data"
-                    mock_response.__enter__ = MagicMock(return_value=mock_response)
-                    mock_response.__exit__ = MagicMock(return_value=False)
-                    mock_urlopen.return_value = mock_response
-                    
-                    args = MagicMock(text="a" * 1000, voice="lively-girl", format="mp3", instruction=None)
-                    text_to_speech(args)
-
-    def test_text_boundary_1(self):
-        """Text exactly 1 char should pass."""
-        with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
-            with patch("stepfun_tts.get_output_path", return_value="/tmp/test.mp3"):
-                with patch("urllib.request.urlopen") as mock_urlopen:
-                    mock_response = MagicMock()
-                    mock_response.headers.get.return_value = "audio/mpeg"
-                    mock_response.read.return_value = b"fake audio data"
-                    mock_response.__enter__ = MagicMock(return_value=mock_response)
-                    mock_response.__exit__ = MagicMock(return_value=False)
-                    mock_urlopen.return_value = mock_response
-                    
-                    args = MagicMock(text="a", voice="lively-girl", format="mp3", instruction=None)
+                    args = MagicMock(text="a", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
                     text_to_speech(args)
 
 
@@ -159,7 +129,7 @@ class TestApiKeyValidation(unittest.TestCase):
             if "STEP_FUN_API_KEY" in os.environ:
                 del os.environ["STEP_FUN_API_KEY"]
             with self.assertRaises(SystemExit):
-                text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None))
+                text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
 
 
 class TestTTSIntegration(unittest.TestCase):
@@ -173,7 +143,7 @@ class TestTTSIntegration(unittest.TestCase):
             
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
-                    args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None)
+                    args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
                     output_path = text_to_speech(args)
                     
                     self.assertTrue(os.path.exists(output_path))
@@ -194,7 +164,15 @@ class TestTTSIntegration(unittest.TestCase):
                         text="Hello world",
                         voice="lively-girl",
                         format="mp3",
-                        instruction="happy, upbeat"
+                        instruction="happy, upbeat",
+                        speed=1.0,
+                        volume=1.0,
+                        sample_rate=24000,
+                        return_url=False,
+                        voice_label=None,
+                        pronunciation_map=None,
+                        stream_format="pcm",
+                        markdown_filter=False
                     )
                     output_path = text_to_speech(args)
                     
@@ -265,14 +243,14 @@ class TestErrorPath(unittest.TestCase):
                 io.BytesIO(b"Internal Server Error")
             )):
                 with self.assertRaises(SystemExit):
-                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None))
+                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
 
     def test_tts_url_error(self):
         """Test URLError (network failure)."""
         with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": "/tmp"}):
             with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
                 with self.assertRaises(SystemExit):
-                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None))
+                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
 
     def test_tts_oversized_response_blocked(self):
         """Test oversized audio response is rejected."""
@@ -290,7 +268,7 @@ class TestErrorPath(unittest.TestCase):
                 with patch("stepfun_tts.get_output_path", return_value=output):
                     with patch("urllib.request.urlopen", return_value=mock_response):
                         with self.assertRaises(SystemExit):
-                            text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None))
+                            text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
         finally:
             if os.path.exists(output):
                 os.unlink(output)
@@ -306,7 +284,7 @@ class TestErrorPath(unittest.TestCase):
         with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": "/tmp"}):
             with patch("urllib.request.urlopen", return_value=mock_response):
                 with self.assertRaises(SystemExit):
-                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None))
+                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
 
     def test_tts_download_url_ssrf_blocked(self):
         """Test SSRF blocks non-https URLs in JSON response."""
@@ -319,7 +297,7 @@ class TestErrorPath(unittest.TestCase):
         with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": "/tmp"}):
             with patch("urllib.request.urlopen", return_value=mock_response):
                 with self.assertRaises(SystemExit):
-                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None))
+                    text_to_speech(MagicMock(text="test", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False))
 
 
 if __name__ == "__main__":

@@ -67,8 +67,12 @@ def transcribe_audio(args):
         sys.exit(1)
 
     # Read audio file and encode to base64
-    with open(args.audio, "rb") as f:
-        audio_data = f.read()
+    try:
+        with open(args.audio, "rb") as f:
+            audio_data = f.read()
+    except OSError as e:
+        print(f"Error: Could not read audio file '{args.audio}': {e}", file=sys.stderr)
+        sys.exit(1)
     
     if len(audio_data) > MAX_RESPONSE_SIZE:
         print(f"Error: Audio file too large ({len(audio_data)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
@@ -105,6 +109,14 @@ def transcribe_audio(args):
             }
         }
     }
+
+    # Add optional hotwords as array
+    if args.hotwords_list:
+        body["audio"]["input"]["transcription"]["hotwords"] = args.hotwords_list
+
+    prompt = getattr(args, 'prompt', None)
+    if isinstance(prompt, str) and prompt:
+        body["audio"]["input"]["transcription"]["prompt"] = prompt
 
     url = f"{API_URL}/audio/asr/sse"
     headers = {
@@ -175,9 +187,18 @@ def transcribe_audio(args):
         # Save transcript to file atomically
         output_path = get_output_path()
         tmp_path = output_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            f.write(full_text)
-        os.replace(tmp_path, output_path)
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                f.write(full_text)
+            os.replace(tmp_path, output_path)
+        except OSError as e:
+            print(f"Error: Could not write transcript file: {e}", file=sys.stderr)
+            # Attempt cleanup of partial temp file
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            sys.exit(1)
         
         print(f"Transcript: {output_path}")
         print(full_text)
@@ -207,8 +228,17 @@ def main():
     parser.add_argument("--language", default="en", help="Language code (default: en, supported: en/zh)")
     parser.add_argument("--verbose", action="store_true", help="Print usage metadata to stderr")
     parser.add_argument("--format", default=None, help="Audio format override (mp3, wav, etc.)")
+    parser.add_argument("--hotwords", default=None, help="Comma-separated hotwords to boost recognition (e.g., 'AI,zeroclaw,API')")
+    parser.add_argument("--prompt", default=None, help="Context prompt for pro model")
 
     args = parser.parse_args()
+
+    # Parse hotwords string into a list
+    args.hotwords_list = (
+        [w.strip() for w in args.hotwords.split(",") if w.strip()]
+        if args.hotwords
+        else None
+    )
 
     transcribe_audio(args)
 

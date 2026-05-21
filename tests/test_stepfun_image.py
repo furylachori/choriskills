@@ -363,7 +363,7 @@ class TestErrorPath(unittest.TestCase):
                         args.text_mode = False
                         args.negative_prompt = ""
                         
-                        with self.assertRaises(PermissionError):
+                        with self.assertRaises(SystemExit):
                             generate_image(args)
             finally:
                 os.chmod(read_only_dir, 0o755)

@@ -6,9 +6,8 @@ Thank you for your interest in contributing! This document outlines the process 
 
 ```
 claw-skills/
-├── stepfun-image-generation/   # Image generation skill
-│   └── SKILL.md
-├── stepfun-image-edit/         # Image edit skill
+├── stepfun-image/                # Image generation & edit skill
+│   ├── stepfun_image.py
 │   └── SKILL.md
 ├── stepfun-tts/                # Text-to-speech skill
 │   ├── SKILL.md

@@ -54,19 +54,21 @@ class TestAudioFileValidation(unittest.TestCase):
                 args.audio = "/nonexistent/path/audio.mp3"
                 args.language = "zh"
                 args.format = None
+                args.hotwords_list = None
                 transcribe_audio(args)
 
     def test_valid_audio_file(self):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(b"fake audio data")
             temp_audio = f.name
-        
+
         try:
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.audio = temp_audio
                 args.language = "zh"
                 args.format = None
+                args.hotwords_list = None
                 self.assertTrue(os.path.exists(args.audio))
         finally:
             os.unlink(temp_audio)
@@ -78,6 +80,7 @@ class TestAudioFileValidation(unittest.TestCase):
                 args.audio = "../../etc/passwd"
                 args.language = "en"
                 args.format = None
+                args.hotwords_list = None
                 normalized = args.audio.replace('\\', '/')
                 parts = normalized.split('/')
                 if '..' in parts:
@@ -89,7 +92,7 @@ class TestApiKeyValidation(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(b"fake audio")
             temp_audio = f.name
-        
+
         try:
             with patch.dict(os.environ, {}, clear=False):
                 if "STEP_FUN_API_KEY" in os.environ:
@@ -99,6 +102,7 @@ class TestApiKeyValidation(unittest.TestCase):
                     args.audio = temp_audio
                     args.language = "zh"
                     args.format = None
+                    args.hotwords_list = None
                     transcribe_audio(args)
         finally:
             os.unlink(temp_audio)
@@ -111,23 +115,23 @@ data: {"type": "transcript.text.delta", "delta": " world"}
 data: {"type": "transcript.text.done", "text": "Hello world", "usage": {"total": 2}}
 data: [DONE]
 """
-        
+
         full_text = ""
         final_usage = None
-        
+
         for line in sse_data.decode('utf-8').split('\n'):
             line = line.strip()
             if not line or not line.startswith('data:'):
                 continue
-            
+
             data_str = line[5:].strip()
             if data_str == '[DONE]':
                 break
-            
+
             try:
                 event = json.loads(data_str)
                 event_type = event.get('type', '')
-                
+
                 if event_type == 'transcript.text.delta':
                     full_text += event.get('delta', '')
                 elif event_type == 'transcript.text.done':
@@ -137,7 +141,7 @@ data: [DONE]
                         full_text = done_text
             except json.JSONDecodeError:
                 continue
-        
+
         self.assertEqual(full_text, "Hello world")
         self.assertIsNotNone(final_usage)
 
@@ -147,7 +151,7 @@ data: [DONE]
 data: {"type": "transcript.text.done", "text": "Correct text", "usage": {}}
 data: [DONE]
 """
-        
+
         full_text = ""
         for line in sse_data.decode('utf-8').split('\n'):
             line = line.strip()
@@ -167,7 +171,7 @@ data: [DONE]
                         full_text = done_text
             except json.JSONDecodeError:
                 continue
-        
+
         self.assertEqual(full_text, "Correct text")
 
     def test_done_empty_falls_back_to_deltas(self):
@@ -176,7 +180,7 @@ data: [DONE]
 data: {"type": "transcript.text.done", "text": "", "usage": {}}
 data: [DONE]
 """
-        
+
         full_text = ""
         for line in sse_data.decode('utf-8').split('\n'):
             line = line.strip()
@@ -196,7 +200,7 @@ data: [DONE]
                         full_text = done_text
             except json.JSONDecodeError:
                 continue
-        
+
         self.assertEqual(full_text, "Hello")
 
 
@@ -230,26 +234,27 @@ class TestASRIntegration(unittest.TestCase):
             )
             with open(audio_path, "wb") as f:
                 f.write(header + data)
-            
+
             sse_chunk = b"""data: {"type": "transcript.text.delta", "delta": "Hello"}
 data: {"type": "transcript.text.done", "text": "Hello world", "usage": {"total": 2}}
 data: [DONE]
 """
-            
+
             mock_response = MagicMock()
             mock_response.read.side_effect = [sse_chunk] + [b''] * 10
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
-            
+
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     args = MagicMock()
                     args.audio = audio_path
                     args.language = "zh"
                     args.format = None
-                    
+                    args.hotwords_list = None
+
                     output_path, transcript = transcribe_audio(args)
-                    
+
                     self.assertTrue(os.path.exists(output_path))
                     self.assertEqual(transcript, "Hello world")
                     self.assertIn("asr_transcript_", output_path)
@@ -284,17 +289,17 @@ data: [DONE]
             )
             with open(audio_path, "wb") as f:
                 f.write(header + data)
-            
+
             sse_chunk = b"""data: {"type": "transcript.text.delta", "delta": "Hi"}
 data: {"type": "transcript.text.done", "text": "Hi", "usage": {}}
 data: [DONE]
 """
-            
+
             mock_response = MagicMock()
             mock_response.read.side_effect = [sse_chunk] + [b''] * 10
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
-            
+
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     with patch.object(sys, 'argv', ['stepfun_asr', '--audio', audio_path, '--format', 'pcm']):
@@ -303,7 +308,8 @@ data: [DONE]
                         args.language = "en"
                         args.format = "pcm"
                         args.verbose = False
-                        
+                        args.hotwords_list = None
+
                         output_path, transcript = transcribe_audio(args)
                         self.assertEqual(transcript, "Hi")
 
@@ -317,7 +323,7 @@ class TestErrorPath(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(b"fake audio")
             temp_audio = f.name
-        
+
         try:
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
                 with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
@@ -328,6 +334,7 @@ class TestErrorPath(unittest.TestCase):
                     args.audio = temp_audio
                     args.language = "en"
                     args.format = None
+                    args.hotwords_list = None
                     with self.assertRaises(SystemExit):
                         transcribe_audio(args)
         finally:
@@ -338,7 +345,7 @@ class TestErrorPath(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(b"fake audio")
             temp_audio = f.name
-        
+
         try:
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
                 with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
@@ -346,6 +353,7 @@ class TestErrorPath(unittest.TestCase):
                     args.audio = temp_audio
                     args.language = "en"
                     args.format = None
+                    args.hotwords_list = None
                     with self.assertRaises(SystemExit):
                         transcribe_audio(args)
         finally:
@@ -355,13 +363,13 @@ class TestErrorPath(unittest.TestCase):
         """Test error when no transcript is received."""
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             audio_path = f.name
-        
+
         try:
             mock_response = MagicMock()
             mock_response.read.return_value = b""
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
-            
+
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": "/tmp"}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     args = MagicMock()
@@ -369,6 +377,7 @@ class TestErrorPath(unittest.TestCase):
                     args.language = "en"
                     args.format = None
                     args.verbose = False
+                    args.hotwords_list = None
                     with self.assertRaises(SystemExit):
                         transcribe_audio(args)
         finally:
@@ -379,13 +388,14 @@ class TestErrorPath(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(b"x" * (stepfun_asr.MAX_RESPONSE_SIZE + 1))
             large_audio = f.name
-        
+
         try:
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.audio = large_audio
                 args.language = "en"
                 args.format = None
+                args.hotwords_list = None
                 with self.assertRaises(SystemExit):
                     transcribe_audio(args)
         finally:
@@ -420,7 +430,7 @@ class TestErrorPath(unittest.TestCase):
             )
             with open(audio_path, "wb") as f:
                 f.write(header + data)
-            
+
             # Include malformed lines that should be skipped
             sse_chunk = (
                 b"data: this is not json\n"
@@ -429,12 +439,12 @@ class TestErrorPath(unittest.TestCase):
                 b"data: {\"type\": \"transcript.text.done\", \"text\": \"Hello\", \"usage\": {}}\n"
                 b"data: [DONE]\n"
             )
-            
+
             mock_response = MagicMock()
             mock_response.read.side_effect = [sse_chunk] + [b''] * 10
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
-            
+
             with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     args = MagicMock()
@@ -442,7 +452,8 @@ class TestErrorPath(unittest.TestCase):
                     args.language = "en"
                     args.format = None
                     args.verbose = False
-                    
+                    args.hotwords_list = None
+
                     output_path, transcript = transcribe_audio(args)
                     self.assertEqual(transcript, "Hello")
 

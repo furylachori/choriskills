@@ -12,9 +12,8 @@ claw-skills/
 ├── LICENSE                          # MIT License
 ├── .env.example                     # Environment variable template
 ├── .gitignore
-├── stepfun-image-generation/        # Skill: Generate images from text
-│   └── SKILL.md
-├── stepfun-image-edit/              # Skill: Edit existing images
+├── stepfun-image/                    # Skill: Generate and edit images from text
+│   ├── stepfun_image.py
 │   └── SKILL.md
 ├── stepfun-tts/                     # StepFun Text-to-Speech skill
 │   ├── SKILL.md
@@ -103,8 +102,7 @@ Skills are loaded from `~/.zeroclaw/workspace/skills/<name>/` by default.
 
 To install skills from this repo:
 ```bash
-zeroclaw skills install /path/to/claw-skills/stepfun-image-generation
-zeroclaw skills install /path/to/claw-skills/stepfun-image-edit
+zeroclaw skills install /path/to/claw-skills/stepfun-image
 zeroclaw skills install /path/to/claw-skills/stepfun-tts
 zeroclaw skills install /path/to/claw-skills/stepfun-asr
 

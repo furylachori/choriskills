@@ -38,7 +38,7 @@ MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
 SIZE_RE = re.compile(r'^\d+x\d+$')
 HTTP_TIMEOUT = 60
 
-API_URL = "https://api.stepfun.ai/step_plan/v1"
+API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
 API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
 
 
@@ -125,25 +125,39 @@ def download_url(url, output_path):
         req = urllib.request.Request(url, headers={"User-Agent": "claw-skills/1.0"})
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
             content_length = response.headers.get('Content-Length')
-            if content_length and int(content_length) > MAX_RESPONSE_SIZE:
-                print(f"Error: Response too large ({content_length} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
-                sys.exit(1)
+            if content_length:
+                try:
+                    content_length_int = int(content_length)
+                except ValueError:
+                    print(f"Error: Non-numeric Content-Length header: '{content_length}'", file=sys.stderr)
+                    sys.exit(1)
+                if content_length_int > MAX_RESPONSE_SIZE:
+                    print(f"Error: Response too large ({content_length_int} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
+                    sys.exit(1)
             
             tmp_path = output_path + ".tmp"
             total = 0
-            with open(tmp_path, "wb") as f:
-                while True:
-                    chunk = response.read(8192)
-                    if not chunk:
-                        break
-                    total += len(chunk)
-                    if total > MAX_RESPONSE_SIZE:
-                        os.unlink(tmp_path)
-                        print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
-                        sys.exit(1)
-                    f.write(chunk)
+            try:
+                with open(tmp_path, "wb") as f:
+                    while True:
+                        chunk = response.read(8192)
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > MAX_RESPONSE_SIZE:
+                            os.unlink(tmp_path)
+                            print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
+                            sys.exit(1)
+                        f.write(chunk)
+            except OSError as e:
+                print(f"Error writing to temporary file '{tmp_path}': {e}", file=sys.stderr)
+                sys.exit(1)
             
-            os.replace(tmp_path, output_path)
+            try:
+                os.replace(tmp_path, output_path)
+            except OSError as e:
+                print(f"Error moving temporary file to '{output_path}': {e}", file=sys.stderr)
+                sys.exit(1)
     except urllib.error.HTTPError as e:
         print(f"Error downloading from URL: HTTP {e.code}", file=sys.stderr)
         sys.exit(1)
@@ -243,16 +257,28 @@ def generate_image(args):
         print("Error: Expected b64_json in response", file=sys.stderr)
         sys.exit(1)
 
-    image_bytes = base64.b64decode(image_data["b64_json"])
+    try:
+        image_bytes = base64.b64decode(image_data["b64_json"])
+    except Exception as e:
+        print(f"Error decoding base64 image data: {e}", file=sys.stderr)
+        sys.exit(1)
     
     if len(image_bytes) > MAX_RESPONSE_SIZE:
         print(f"Error: Image data too large ({len(image_bytes)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
         sys.exit(1)
     
     tmp_path = args.output + ".tmp"
-    with open(tmp_path, "wb") as f:
-        f.write(image_bytes)
-    os.replace(tmp_path, args.output)
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(image_bytes)
+    except OSError as e:
+        print(f"Error writing image to temporary file '{tmp_path}': {e}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        os.replace(tmp_path, args.output)
+    except OSError as e:
+        print(f"Error moving temporary file to '{args.output}': {e}", file=sys.stderr)
+        sys.exit(1)
     
     print(f"Image generated: {args.output}")
     if args.verbose and "seed" in image_data:
