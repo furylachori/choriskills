@@ -10,8 +10,8 @@ This document contains the full API details for agent implementation and debuggi
 | `https://api.stepfun.ai/step_plan/v1` | Step Plan billing (V0-V5 tiers) |
 
 **Which to use:**
-- Most audio endpoints (`audio/asr/sse`, `audio/speech`, `audio/voices`, etc.) use `step_plan/v1` for plan credits.
-- The `files` endpoint uses `/v1` (open platform base), not `step_plan/v1`. The code in `stepfun_voice.py` handles this automatically.
+- Most audio endpoints (`audio/asr/sse`, `audio/speech`, etc.) use `step_plan/v1` for plan credits.
+- The `files` endpoint uses `/v1` (open platform base), not `step_plan/v1`.
 - For open platform access without a Step Plan, set `STEPFUN_API_BASE=https://api.stepfun.ai/v1`.
 
 ## Endpoints

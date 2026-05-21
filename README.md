@@ -22,9 +22,6 @@ claw-skills/
 ├── stepfun-asr/                     # StepFun Speech Recognition skill
 │   ├── SKILL.md
 │   └── stepfun_asr.py
-├── stepfun-voice-cloning/            # Skill: Clone voices from reference audio
-│   ├── SKILL.md
-│   └── stepfun_voice.py
 
 └── tests/                           # Unit tests for all skills
     ├── test_stepfun_image.py
@@ -42,7 +39,6 @@ pytest tests/ -v
 pytest tests/test_stepfun_image.py -v
 pytest tests/test_stepfun_tts.py -v
 pytest tests/test_stepfun_asr.py -v
-pytest tests/test_stepfun_voice.py -v
 
 ```
 
@@ -87,11 +83,6 @@ pytest tests/ -v -k "not Integration"
 | `test_live_image_edit` | Edit from a generated base image, valid PNG output |
 | `test_live_tts_mp3` | MP3 output, valid header, size > 1KB |
 | `test_live_tts_wav_format` | WAV output format works correctly |
-| `test_live_roundtrip_tts_asr` | TTS → ASR text match ≥ 80% fuzzy similarity |
-| `test_live_roundtrip_tts_asr_short_text` | Short phrase roundtrip ≥ 70% similarity |
-
-Text matching uses fuzzy comparison (`difflib.SequenceMatcher`) because TTS/ASR
-roundtrips may vary in punctuation, casing, or minor word differences.
 
 ## Script Conventions
 
@@ -116,7 +107,6 @@ zeroclaw skills install /path/to/claw-skills/stepfun-image-generation
 zeroclaw skills install /path/to/claw-skills/stepfun-image-edit
 zeroclaw skills install /path/to/claw-skills/stepfun-tts
 zeroclaw skills install /path/to/claw-skills/stepfun-asr
-zeroclaw skills install /path/to/claw-skills/stepfun-voice-cloning
 
 ```
 
