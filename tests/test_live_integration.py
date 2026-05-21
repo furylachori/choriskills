@@ -313,6 +313,34 @@ class TestLiveTTS(unittest.TestCase):
                 self.assertTrue(is_id3 or is_mpeg_sync,
                     f"Downloaded file does not appear to be valid MP3. Header: {header!r}")
 
+    def test_live_tts_with_instruction(self):
+        """Test TTS with emotion instruction - exercises instruction parameter."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setenv("OUTPUT_DIR", tmpdir)
+                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+
+                args = MagicMock()
+                args.text = "This is a test with emotion guidance."
+                args.voice = "lively-girl"
+                args.format = "mp3"
+                args.instruction = "happy and energetic"
+                args.verbose = False
+                args.speed = 1.0
+                args.volume = 1.0
+                args.sample_rate = 24000
+                args.return_url = False
+                args.voice_label = None
+                args.pronunciation_map = None
+                args.stream_format = "audio"
+                args.markdown_filter = False
+
+                output_path = stepfun_tts.text_to_speech(args)
+
+                self.assertTrue(os.path.exists(output_path))
+                size = os.path.getsize(output_path)
+                self.assertGreater(size, 1024)
+
 
 @pytest.mark.integration
 @pytest.mark.skipif(
@@ -383,6 +411,58 @@ class TestLiveASR(unittest.TestCase):
                 self.assertTrue(len(content) > 0, "Transcript is empty")
                 # The transcript text should also be returned
                 self.assertIsInstance(transcript, str)
+
+    def test_live_asr_with_hotwords(self):
+        """Test ASR with hotwords parameter - boosts recognition of specific terms."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setenv("OUTPUT_DIR", tmpdir)
+                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+
+                # Same 440Hz sine wave audio
+                audio_path = os.path.join(tmpdir, "test_speech_hotwords.wav")
+                sample_rate = 16000
+                num_samples = 16000
+                data = b""
+                for i in range(num_samples):
+                    import math
+                    val = int(32767 * 0.3 * math.sin(2 * math.pi * 440 * i / sample_rate))
+                    data += struct.pack('<h', val)
+
+                byte_rate = sample_rate * 2
+                data_size = len(data)
+                header = (
+                    b"RIFF"
+                    + struct.pack('<I', 36 + data_size)
+                    + b"WAVE"
+                    + b"fmt "
+                    + struct.pack('<I', 16)
+                    + struct.pack('<H', 1)
+                    + struct.pack('<H', 1)
+                    + struct.pack('<I', sample_rate)
+                    + struct.pack('<I', byte_rate)
+                    + struct.pack('<H', 2)
+                    + struct.pack('<H', 16)
+                    + b"data"
+                    + struct.pack('<I', data_size)
+                )
+                with open(audio_path, "wb") as f:
+                    f.write(header + data)
+
+                args = MagicMock()
+                args.audio = audio_path
+                args.language = "en"
+                args.format = None
+                args.verbose = False
+                args.hotwords = "zeroclaw,claude,API"
+                args.hotwords_list = ["zeroclaw", "claude", "API"]
+                args.prompt = None
+
+                output_path, transcript = stepfun_asr.transcribe_audio(args)
+
+                self.assertTrue(os.path.exists(output_path))
+                content = open(output_path, "r", encoding="utf-8").read()
+                self.assertTrue(len(content) > 0)
 
 
 if __name__ == "__main__":
