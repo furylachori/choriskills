@@ -240,6 +240,14 @@ class TestLiveTTS(unittest.TestCase):
                 args.format = "mp3"
                 args.instruction = None
                 args.verbose = False
+                args.speed = 1.0
+                args.volume = 1.0
+                args.sample_rate = 24000
+                args.return_url = False
+                args.voice_label = None
+                args.pronunciation_map = None
+                args.stream_format = "audio"
+                args.markdown_filter = False
 
                 output_path = stepfun_tts.text_to_speech(args)
 
@@ -276,6 +284,14 @@ class TestLiveTTS(unittest.TestCase):
                 args.format = "wav"
                 args.instruction = None
                 args.verbose = False
+                args.speed = 1.0
+                args.volume = 1.0
+                args.sample_rate = 24000
+                args.return_url = False
+                args.voice_label = None
+                args.pronunciation_map = None
+                args.stream_format = "audio"
+                args.markdown_filter = False
 
                 output_path = stepfun_tts.text_to_speech(args)
 
