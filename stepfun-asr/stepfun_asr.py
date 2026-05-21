@@ -18,11 +18,17 @@ import base64
 import json
 import mimetypes
 import os
+import re
 import sys
 import urllib.request
 import urllib.error
 from datetime import datetime
 
+
+ALLOWED_SCHEMES = {"https"}
+ALLOWED_HOSTS = {"api.stepfun.ai"}
+MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
+HTTP_TIMEOUT = 60
 
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
 API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
@@ -53,9 +59,20 @@ def transcribe_audio(args):
         print(f"Error: Audio file '{args.audio}' does not exist.", file=sys.stderr)
         sys.exit(1)
 
+    # Validate no path traversal in audio path
+    normalized = args.audio.replace('\\', '/')
+    parts = normalized.split('/')
+    if '..' in parts:
+        print(f"Error: Audio path contains '..' which is not allowed.", file=sys.stderr)
+        sys.exit(1)
+
     # Read audio file and encode to base64
     with open(args.audio, "rb") as f:
         audio_data = f.read()
+    
+    if len(audio_data) > MAX_RESPONSE_SIZE:
+        print(f"Error: Audio file too large ({len(audio_data)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
+        sys.exit(1)
     
     audio_base64 = base64.b64encode(audio_data).decode('utf-8')
     
@@ -64,6 +81,10 @@ def transcribe_audio(args):
     format_type = mime_type.split('/')[-1]
     if format_type == 'mpeg':
         format_type = 'mp3'
+    
+    # Allow format override via --format
+    if args.format:
+        format_type = args.format
     
     # Build request body
     body = {
@@ -97,9 +118,9 @@ def transcribe_audio(args):
     try:
         full_text = ""
         final_usage = None
+        done_text = None
         
-        with urllib.request.urlopen(req) as response:
-            # Read SSE stream
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
             buffer = b""
             max_empty_reads = 3
             empty_reads = 0
@@ -115,7 +136,6 @@ def transcribe_audio(args):
                 empty_reads = 0
                 buffer += chunk
                 
-                # Process complete lines
                 while b'\n' in buffer:
                     line, buffer = buffer.split(b'\n', 1)
                     line = line.decode('utf-8', errors='replace').strip()
@@ -135,12 +155,11 @@ def transcribe_audio(args):
                             delta = event.get('delta', '')
                             full_text += delta
                         elif event_type == 'transcript.text.done':
-                            full_text = event.get('text', full_text)
+                            done_text = event.get('text', '')
                             final_usage = event.get('usage')
-                        elif event_type == 'error':
-                            error_msg = event.get('message', 'Unknown ASR error')
-                            print(f"ASR Error: {error_msg}", file=sys.stderr)
-                            sys.exit(1)
+                            # done event is authoritative; if it's empty use accumulated deltas
+                            if done_text.strip():
+                                full_text = done_text
                     except json.JSONDecodeError:
                         continue
         
@@ -153,10 +172,12 @@ def transcribe_audio(args):
                 print("Debug: SSE stream returned zero data - endpoint may not support this audio format", file=sys.stderr)
             sys.exit(1)
         
-        # Save transcript to file
+        # Save transcript to file atomically
         output_path = get_output_path()
-        with open(output_path, "w", encoding="utf-8") as f:
+        tmp_path = output_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(full_text)
+        os.replace(tmp_path, output_path)
         
         print(f"Transcript: {output_path}")
         print(full_text)
@@ -175,6 +196,9 @@ def transcribe_audio(args):
             error_msg = error_body
         print(f"ASR API Error ({e.code}): {error_msg}", file=sys.stderr)
         sys.exit(1)
+    except urllib.error.URLError as e:
+        print(f"ASR API Error: {e.reason}", file=sys.stderr)
+        sys.exit(1)
 
 
 def main():
@@ -182,7 +206,7 @@ def main():
     parser.add_argument("--audio", required=True, help="Audio file path (mp3, wav, etc.)")
     parser.add_argument("--language", default="en", help="Language code (default: en, supported: en/zh)")
     parser.add_argument("--verbose", action="store_true", help="Print usage metadata to stderr")
-    parser.add_argument("--format", default=None, help="Audio format (mp3, wav, etc.) - auto-detected if not specified")
+    parser.add_argument("--format", default=None, help="Audio format override (mp3, wav, etc.)")
 
     args = parser.parse_args()
 

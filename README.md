@@ -7,20 +7,25 @@ Reusable skills for zeroclaw agents.
 ```
 claw-skills/
 ├── README.md                        # This file
-├── stepfun-image/                   # StepFun Image API skill (generation + edit)
-│   ├── generation.md                # Skill: Generate images from text
-│   ├── edit.md                      # Skill: Edit existing images
-│   └── stepfun_image.py             # Shared script (handles both operations)
+├── TECHNICAL_REFERENCE.md           # Full API specs, error codes, rate limits
+├── CONTRIBUTING.md                  # How to add new skills
+├── LICENSE                          # MIT License
+├── .env.example                     # Environment variable template
+├── .gitignore
+├── stepfun-image-generation/        # Skill: Generate images from text
+│   └── SKILL.md
+├── stepfun-image-edit/              # Skill: Edit existing images
+│   └── SKILL.md
 ├── stepfun-tts/                     # StepFun Text-to-Speech skill
-│   ├── SKILL.md                     # Skill definition
-│   └── stepfun_tts.py               # TTS script
+│   ├── SKILL.md
+│   └── stepfun_tts.py
 ├── stepfun-asr/                     # StepFun Speech Recognition skill
-│   ├── SKILL.md                     # Skill definition
-│   └── stepfun_asr.py               # ASR script
-└── tests/                            # Unit tests for all skills
-    ├── test_stepfun_image.py        # Tests for image gen/edit
-    ├── test_stepfun_tts.py          # Tests for TTS
-    └── test_stepfun_asr.py          # Tests for ASR
+│   ├── SKILL.md
+│   └── stepfun_asr.py
+└── tests/                           # Unit tests for all skills
+    ├── test_stepfun_image.py
+    ├── test_stepfun_tts.py
+    └── test_stepfun_asr.py
 ```
 
 ## Running Tests
@@ -46,7 +51,7 @@ pytest tests/test_stepfun_asr.py -v
 
 ## Technical Reference
 
-Full API specs, parameter details, and error codes: [TECHNICAL_REFERENCE.md](TECHNICAL_REFERENCE.md)
+Full API specs, parameter details, error codes, and rate limits: [TECHNICAL_REFERENCE.md](TECHNICAL_REFERENCE.md)
 
 ## Zeroclaw Integration
 
@@ -54,7 +59,8 @@ Skills are loaded from `~/.zeroclaw/workspace/skills/<name>/` by default.
 
 To install skills from this repo:
 ```bash
-zeroclaw skills install /path/to/claw-skills/stepfun-image
+zeroclaw skills install /path/to/claw-skills/stepfun-image-generation
+zeroclaw skills install /path/to/claw-skills/stepfun-image-edit
 zeroclaw skills install /path/to/claw-skills/stepfun-tts
 zeroclaw skills install /path/to/claw-skills/stepfun-asr
 ```
@@ -66,3 +72,4 @@ All scripts require:
 
 Optional:
 - `OUTPUT_DIR` — Output directory (default: `~/.zeroclaw/workspace/output`)
+- `STEPFUN_API_BASE` — Override API base URL (default: `https://api.stepfun.ai/step_plan/v1`)

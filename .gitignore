@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+*.mp3
+*.wav
+*.ogg
+*.png
+*.jpg
+*.jpeg
+*.flac
+*.opus
+.DS_Store
+*.log
+step-tts-contextual.mp3
