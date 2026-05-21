@@ -38,11 +38,17 @@ python stepfun_image.py edit --prompt "Make the dog look older and chubbier" --i
 
 Both commands accept:
 
-- `--size 768x1360` — portrait shape
-- `--steps 12` — higher quality (slower)
-- `--seed 42` — same result each time
-- `--text-mode` — render text in the image
-- `--negative-prompt "blurry, low quality"` — exclude unwanted features
+ - `--size 768x1360` — portrait shape
+ - `--steps 12` — higher quality (slower)
+ - `--seed 42` — same result each time
+ - `--text-mode` — render text in the image
+ - `--negative-prompt "blurry, low quality"` — exclude unwanted features
+
+## Supported Models
+
+| Skill | Model | Notes |
+|---|---|---|
+| stepfun-image | `step-image-edit-2` | Used for both generation and edit |
 
 ### Image sizes
 
@@ -83,6 +89,17 @@ STEP_FUN_API_KEY=your-api-key-here
 ```
 
 ## Output
+
+### Output Format
+
+The script prints the **absolute file path** to **stdout**. This is the only output on stdout — all metadata goes to stderr (when `--verbose` is used).
+
+Example stdout:
+```
+/Users/dastua/.zeroclaw/workspace/output/generate_a_cat_20250621_123456.png
+```
+
+This allows agents to reliably capture the output file path using stdout parsing.
 
 ```
 Image generated: /Users/dastua/.zeroclaw/workspace/output/generate_a_serene_alpine_lake_20250621_123456.png

@@ -58,7 +58,24 @@ python stepfun_tts.py --text "Welcome to Desampa" --voice elegantgentle-female -
 | `--markdown-filter` | false | flag | Strip markdown syntax before synthesis |
 | `--verbose` | false | flag | Print metadata to stderr |
 
+## Supported Models
+
+| Skill | Model | Notes |
+|---|---|---|
+| stepfun-tts | `stepaudio-2.5-tts` | 40+ voices available |
+
 ## What You'll See
+
+### Output Format
+
+The script prints the **absolute file path** to **stdout**. This is the only output on stdout — all metadata goes to stderr (when `--verbose` is used).
+
+Example stdout:
+```
+/Users/dastua/.zeroclaw/workspace/output/tts_lively_girl_20250621_123456.mp3
+```
+
+This allows agents to reliably capture the output file path using stdout parsing.
 
 ```
 Audio generated: /Users/dastua/.zeroclaw/workspace/output/tts_lively_girl_20250621_123456.mp3
