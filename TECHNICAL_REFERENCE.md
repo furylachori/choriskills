@@ -165,7 +165,7 @@ The `done` event is authoritative — if present and non-empty, it replaces accu
 | Code | Meaning | Action |
 |---|---|---|
 | 400 | Bad request | Check parameter format and values |
-| 401 | Unauthorized | Verify `STEP_FUN_API_KEY` is set correctly |
+| 401 | Unauthorized | Verify `STEPFUN_API_KEY` is set correctly |
 | 402 | Payment required | Step Plan credits exhausted — top up or upgrade plan |
 | 403 | Forbidden | API key lacks permission for this feature |
 | 404 | Not found | Check endpoint URL |
@@ -209,7 +209,7 @@ All scripts in this repo follow these rules:
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `STEP_FUN_API_KEY` | Yes | — | StepFun API key |
+| `STEPFUN_API_KEY` | Yes | — | StepFun API key |
 | `OUTPUT_DIR` | No | `~/.zeroclaw/workspace/output` | Output directory |
 | `STEPFUN_API_BASE` | No | `https://api.stepfun.ai/step_plan/v1` | Override API base URL |
 

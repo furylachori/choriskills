@@ -80,12 +80,12 @@ Square: `1024x1024` | Portrait: `768x1360`, `896x1184` | Landscape: `1360x768`, 
 Before running, set the required environment variable:
 
 ```bash
-export STEP_FUN_API_KEY="your-api-key-here"
+export STEPFUN_API_KEY="your-api-key-here"
 ```
 
 Or create a `.env` file in the skill directory:
 ```
-STEP_FUN_API_KEY=your-api-key-here
+STEPFUN_API_KEY=your-api-key-here
 ```
 
 ## Output
@@ -104,7 +104,7 @@ The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/workspace/output`). No
 
 - **"--size is ignored for edit"** — The edit API accepts but ignores the size parameter; output dimensions are determined by the API
 - **"Prompt must be 1–512 characters"** — shorten your prompt
-- **"API key not set"** — add `STEP_FUN_API_KEY` to your environment
+- **"API key not set"** — add `STEPFUN_API_KEY` to your environment
 - **"Input file does not exist"** — check the `--input` path
 - **"Invalid image format"** — use PNG or JPEG
 - **Image has wrong text** — try `--text-mode` flag

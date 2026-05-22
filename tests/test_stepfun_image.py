@@ -184,8 +184,8 @@ class TestValidation(unittest.TestCase):
 class TestApiKeyValidation(unittest.TestCase):
     def test_missing_api_key(self):
         with patch.dict(os.environ, {}, clear=False):
-            if "STEP_FUN_API_KEY" in os.environ:
-                del os.environ["STEP_FUN_API_KEY"]
+            if "STEPFUN_API_KEY" in os.environ:
+                del os.environ["STEPFUN_API_KEY"]
             with self.assertRaises(SystemExit):
                 call_api("images/generations", data={})
 
@@ -195,7 +195,7 @@ class TestApiKeyValidation(unittest.TestCase):
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         
-        with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test-key"}):
+        with patch.dict(os.environ, {"STEPFUN_API_KEY": "test-key"}):
             with patch("urllib.request.urlopen", return_value=mock_response):
                 try:
                     call_api("images/generations", data={})
@@ -206,7 +206,7 @@ class TestApiKeyValidation(unittest.TestCase):
 class TestInputFileValidation(unittest.TestCase):
     def test_missing_input_file(self):
         with self.assertRaises(SystemExit):
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.input = "/nonexistent/path/image.png"
                 args.prompt = "test prompt"
@@ -216,7 +216,7 @@ class TestInputFileValidation(unittest.TestCase):
 
     def test_input_path_with_traversal(self):
         with self.assertRaises(SystemExit):
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.input = "../../etc/passwd"
                 args.prompt = "test"
@@ -229,7 +229,7 @@ class TestScriptIntegration(unittest.TestCase):
             mock_response = {
                 "data": [{"b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "seed": 42}]
             }
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("stepfun_image.call_api", return_value=mock_response):
                     args = MagicMock()
                     args.prompt = "test prompt"
@@ -249,7 +249,7 @@ class TestScriptIntegration(unittest.TestCase):
             mock_response = {
                 "data": [{"url": "https://api.stepfun.ai/test.png", "seed": 42}]
             }
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("stepfun_image.call_api", return_value=mock_response):
                     with patch("stepfun_image.download_url") as mock_download:
                         input_path = os.path.join(tmpdir, "input.png")
@@ -279,7 +279,7 @@ class TestErrorPath(unittest.TestCase):
     def test_generate_http_error_non_json(self):
         """Test HTTPError with non-JSON body."""
         import io
-        with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+        with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
             with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
                 "https://api.stepfun.ai/img", 500, "Server Error", {},
                 io.BytesIO(b"Internal Server Error")
@@ -289,14 +289,14 @@ class TestErrorPath(unittest.TestCase):
 
     def test_generate_url_error(self):
         """Test URLError (network failure)."""
-        with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+        with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
             with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
                 with self.assertRaises(SystemExit):
                     call_api("images/generations", data={"prompt": "test"})
 
     def test_generate_empty_response_data(self):
         """Test empty data array in response."""
-        with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+        with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
             with patch("urllib.request.urlopen") as mock_urlopen:
                 mock_response = MagicMock()
                 mock_response.read.return_value = b'{"data": []}'
@@ -319,7 +319,7 @@ class TestErrorPath(unittest.TestCase):
 
     def test_generate_missing_b64_json(self):
         """Test response without b64_json field."""
-        with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+        with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
             with patch("urllib.request.urlopen") as mock_urlopen:
                 mock_response = MagicMock()
                 mock_response.read.return_value = b'{"data": [{"url": "https://..."}]}'
@@ -351,7 +351,7 @@ class TestErrorPath(unittest.TestCase):
                 mock_response = {
                     "data": [{"b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}]
                 }
-                with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": read_only_dir}):
+                with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": read_only_dir}):
                     with patch("stepfun_image.call_api", return_value=mock_response):
                         args = MagicMock()
                         args.prompt = "test"

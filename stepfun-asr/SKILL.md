@@ -53,7 +53,7 @@ Extract the file path from the last whitespace-delimited token or after the colo
 - **"No transcript received"** — the audio may be too short, silent, or synthetic (TTS audio often fails)
 - **"hotwords/prompt require pro model"** — these parameters only work with stepaudio-2.5-asr-pro
 - **"Audio file does not exist"** — check the `--audio` path
-- **"API key not set"** — add `STEP_FUN_API_KEY` to your environment
+- **"API key not set"** — add `STEPFUN_API_KEY` to your environment
 - **"Unsupported language"** — use `en` or `zh`
 
 ## Technical Reference

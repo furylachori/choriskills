@@ -6,7 +6,7 @@ Convert text to speech using StepFun's TTS API.
 
 ```bash
 # Set your API key
-export STEP_FUN_API_KEY="your-key-here"
+export STEPFUN_API_KEY="your-key-here"
 
 # Synthesize speech
 python stepfun_tts.py synthesize --text "Hello, world!"

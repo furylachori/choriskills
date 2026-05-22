@@ -48,7 +48,7 @@ claw-skills/
 1. Copy the environment template and add your API key:
    ```bash
    cp .env.example .env
-   # Edit .env and set STEP_FUN_API_KEY=your-key-here
+   # Edit .env and set STEPFUN_API_KEY=your-key-here
    ```
 
 2. Validate the installation (no API key required):
@@ -58,7 +58,7 @@ claw-skills/
 
 3. Set your API key and run a skill:
    ```bash
-   export STEP_FUN_API_KEY="your-key-here"
+   export STEPFUN_API_KEY="your-key-here"
    cd stepfun-image && python main.py generate --prompt "A cat"
    ```
 
@@ -107,7 +107,7 @@ pytest tests/ -v -k "not integration"
 
 ### Requirements
 
-- `STEP_FUN_API_KEY` environment variable must be set (live tests are auto-skipped if missing)
+- `STEPFUN_API_KEY` environment variable must be set (live tests are auto-skipped if missing)
 - Internet connectivity to `api.stepfun.ai`
 - Active StepFun plan with available credits
 
@@ -149,7 +149,7 @@ zeroclaw skills install /path/to/claw-skills/stepfun-asr
 ## Environment Variables
 
 All scripts require:
-- `STEP_FUN_API_KEY` — Your StepFun API key
+- `STEPFUN_API_KEY` — Your StepFun API key
 
 Optional:
 - `OUTPUT_DIR` — Output directory (default: `~/.zeroclaw/workspace/output`)

@@ -20,7 +20,7 @@ Usage:
     python stepfun_asr.py --audio recording.wav --language en
 
 Environment:
-    STEP_FUN_API_KEY - Required. Your StepFun API key.
+    STEPFUN_API_KEY - Required. Your StepFun API key.
     OUTPUT_DIR - Optional. Output directory for transcript (default: $HOME/.zeroclaw/workspace/output)
 """
 
@@ -45,7 +45,7 @@ SSE_READ_TIMEOUT = 120               # 2 minute wall-clock timeout for SSE strea
 HTTP_TIMEOUT = 60
 
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
-API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
+API_KEY = os.environ.get("STEPFUN_API_KEY", "")
 
 
 def _urlopen_with_retry(req, timeout, max_retries=2):
@@ -168,9 +168,9 @@ def get_output_path(extension="txt"):
 
 def transcribe_audio(args):
     """Transcribe audio using StepFun ASR."""
-    api_key = os.environ.get("STEP_FUN_API_KEY", "")
+    api_key = os.environ.get("STEPFUN_API_KEY", "")
     if not api_key:
-        print("Error: STEP_FUN_API_KEY environment variable is not set.", file=sys.stderr)
+        print("Error: STEPFUN_API_KEY environment variable is not set.", file=sys.stderr)
         sys.exit(EXIT_AUTH_ERROR)
 
     if not os.path.exists(args.audio):

@@ -9,7 +9,7 @@ Usage:
     python stepfun_tts.py --text "Sing this song" --voice cixingnansheng --instruction "happy, upbeat"
 
 Environment:
-    STEP_FUN_API_KEY - Required. Your StepFun API key.
+    STEPFUN_API_KEY - Required. Your StepFun API key.
     OUTPUT_DIR - Optional. Output directory (default: $HOME/.zeroclaw/workspace/output)
 """
 
@@ -42,7 +42,7 @@ EXIT_API_ERROR = 6        # API returned error (400, 500, etc.)
 EXIT_FILE_ERROR = 7       # Disk full, permission denied, I/O failures
 
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
-API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
+API_KEY = os.environ.get("STEPFUN_API_KEY", "")
 
 
 def _urlopen_with_retry(req, timeout, max_retries=2):
@@ -319,9 +319,9 @@ def validate_json_depth(obj, max_depth=10, max_keys=1000):
 
 def text_to_speech(args):
     """Convert text to speech using StepFun TTS."""
-    api_key = os.environ.get("STEP_FUN_API_KEY", "")
+    api_key = os.environ.get("STEPFUN_API_KEY", "")
     if not api_key:
-        print("Error: STEP_FUN_API_KEY environment variable is not set.", file=sys.stderr)
+        print("Error: STEPFUN_API_KEY environment variable is not set.", file=sys.stderr)
         sys.exit(EXIT_AUTH_ERROR)
 
     # Sanitize text input

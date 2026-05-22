@@ -2,7 +2,7 @@
 """
 Live integration tests for StepFun API skills.
 
-These tests hit the real StepFun API and require STEP_FUN_API_KEY to be set.
+These tests hit the real StepFun API and require STEPFUN_API_KEY to be set.
 They are marked with @pytest.mark.integration so they can be skipped by default.
 
 Run with:
@@ -36,7 +36,7 @@ import stepfun_asr
 
 
 # Cost warning banner printed when module loads if API key is present
-if os.environ.get("STEP_FUN_API_KEY"):
+if os.environ.get("STEPFUN_API_KEY"):
     print("""
 ======================================================================
   LIVE INTEGRATION TESTS — REAL API CALLS
@@ -88,8 +88,8 @@ def _make_minimal_wav(path, duration_sec=0.1, sample_rate=16000):
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not os.environ.get("STEP_FUN_API_KEY"),
-    reason="STEP_FUN_API_KEY environment variable is required"
+    not os.environ.get("STEPFUN_API_KEY"),
+    reason="STEPFUN_API_KEY environment variable is required"
 )
 class TestLiveImageGeneration(unittest.TestCase):
     """Test real image generation against the StepFun API."""
@@ -99,7 +99,7 @@ class TestLiveImageGeneration(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.MonkeyPatch.context() as mp:
                 mp.setenv("OUTPUT_DIR", tmpdir)
-                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+                mp.setenv("STEPFUN_API_KEY", os.environ["STEPFUN_API_KEY"])
 
                 args = MagicMock()
                 args.prompt = "A cute red panda sitting on a bamboo branch, digital art"
@@ -136,7 +136,7 @@ class TestLiveImageGeneration(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.MonkeyPatch.context() as mp:
                 mp.setenv("OUTPUT_DIR", tmpdir)
-                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+                mp.setenv("STEPFUN_API_KEY", os.environ["STEPFUN_API_KEY"])
 
                 args = MagicMock()
                 args.prompt = "A mountain landscape at sunset"
@@ -159,8 +159,8 @@ class TestLiveImageGeneration(unittest.TestCase):
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not os.environ.get("STEP_FUN_API_KEY"),
-    reason="STEP_FUN_API_KEY environment variable is required"
+    not os.environ.get("STEPFUN_API_KEY"),
+    reason="STEPFUN_API_KEY environment variable is required"
 )
 class TestLiveImageEdit(unittest.TestCase):
     """Test real image editing against the StepFun API."""
@@ -170,7 +170,7 @@ class TestLiveImageEdit(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.MonkeyPatch.context() as mp:
                 mp.setenv("OUTPUT_DIR", tmpdir)
-                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+                mp.setenv("STEPFUN_API_KEY", os.environ["STEPFUN_API_KEY"])
 
                 # Step 1: Generate a base image to edit
                 gen_args = MagicMock()
@@ -221,8 +221,8 @@ class TestLiveImageEdit(unittest.TestCase):
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not os.environ.get("STEP_FUN_API_KEY"),
-    reason="STEP_FUN_API_KEY environment variable is required"
+    not os.environ.get("STEPFUN_API_KEY"),
+    reason="STEPFUN_API_KEY environment variable is required"
 )
 class TestLiveTTS(unittest.TestCase):
     """Test real text-to-speech against the StepFun API."""
@@ -232,7 +232,7 @@ class TestLiveTTS(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.MonkeyPatch.context() as mp:
                 mp.setenv("OUTPUT_DIR", tmpdir)
-                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+                mp.setenv("STEPFUN_API_KEY", os.environ["STEPFUN_API_KEY"])
 
                 args = MagicMock()
                 args.text = "Hello, this is a live integration test of the text to speech system."
@@ -281,7 +281,7 @@ class TestLiveTTS(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.MonkeyPatch.context() as mp:
                 mp.setenv("OUTPUT_DIR", tmpdir)
-                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+                mp.setenv("STEPFUN_API_KEY", os.environ["STEPFUN_API_KEY"])
 
                 args = MagicMock()
                 args.text = "Testing the return URL feature."
@@ -318,7 +318,7 @@ class TestLiveTTS(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.MonkeyPatch.context() as mp:
                 mp.setenv("OUTPUT_DIR", tmpdir)
-                mp.setenv("STEP_FUN_API_KEY", os.environ["STEP_FUN_API_KEY"])
+                mp.setenv("STEPFUN_API_KEY", os.environ["STEPFUN_API_KEY"])
 
                 args = MagicMock()
                 args.text = "This is a test with emotion guidance."
@@ -357,8 +357,8 @@ class TestLiveTTS(unittest.TestCase):
 
 if __name__ == "__main__":
     # Allow running directly: python tests/test_live_integration.py
-    if not os.environ.get("STEP_FUN_API_KEY"):
-        print("SKIP: STEP_FUN_API_KEY not set. Skipping live integration tests.",
+    if not os.environ.get("STEPFUN_API_KEY"):
+        print("SKIP: STEPFUN_API_KEY not set. Skipping live integration tests.",
               file=sys.stderr)
         sys.exit(0)
     unittest.main()

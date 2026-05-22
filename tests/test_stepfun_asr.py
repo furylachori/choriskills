@@ -49,7 +49,7 @@ class TestOutputPath(unittest.TestCase):
 class TestAudioFileValidation(unittest.TestCase):
     def test_missing_audio_file(self):
         with self.assertRaises(SystemExit):
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.audio = "/nonexistent/path/audio.mp3"
                 args.language = "zh"
@@ -63,7 +63,7 @@ class TestAudioFileValidation(unittest.TestCase):
             temp_audio = f.name
 
         try:
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.audio = temp_audio
                 args.language = "zh"
@@ -75,7 +75,7 @@ class TestAudioFileValidation(unittest.TestCase):
 
     def test_audio_path_traversal_blocked(self):
         with self.assertRaises(SystemExit):
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.audio = "../../etc/passwd"
                 args.language = "en"
@@ -95,8 +95,8 @@ class TestApiKeyValidation(unittest.TestCase):
 
         try:
             with patch.dict(os.environ, {}, clear=False):
-                if "STEP_FUN_API_KEY" in os.environ:
-                    del os.environ["STEP_FUN_API_KEY"]
+                if "STEPFUN_API_KEY" in os.environ:
+                    del os.environ["STEPFUN_API_KEY"]
                 with self.assertRaises(SystemExit):
                     args = MagicMock()
                     args.audio = temp_audio
@@ -245,7 +245,7 @@ data: [DONE]
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
 
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     args = MagicMock()
                     args.audio = audio_path
@@ -300,7 +300,7 @@ data: [DONE]
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
 
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     with patch.object(sys, 'argv', ['stepfun_asr', '--audio', audio_path, '--format', 'pcm']):
                         args = MagicMock()
@@ -325,7 +325,7 @@ class TestErrorPath(unittest.TestCase):
             temp_audio = f.name
 
         try:
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
                     "https://api.stepfun.ai/asr", 500, "Server Error", {},
                     io.BytesIO(b"Internal Server Error")
@@ -347,7 +347,7 @@ class TestErrorPath(unittest.TestCase):
             temp_audio = f.name
 
         try:
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
                     args = MagicMock()
                     args.audio = temp_audio
@@ -370,7 +370,7 @@ class TestErrorPath(unittest.TestCase):
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
 
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": "/tmp"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": "/tmp"}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     args = MagicMock()
                     args.audio = audio_path
@@ -390,7 +390,7 @@ class TestErrorPath(unittest.TestCase):
             large_audio = f.name
 
         try:
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test"}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
                 args = MagicMock()
                 args.audio = large_audio
                 args.language = "en"
@@ -445,7 +445,7 @@ class TestErrorPath(unittest.TestCase):
             mock_response.__enter__ = MagicMock(return_value=mock_response)
             mock_response.__exit__ = MagicMock(return_value=False)
 
-            with patch.dict(os.environ, {"STEP_FUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
+            with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
                 with patch("urllib.request.urlopen", return_value=mock_response):
                     args = MagicMock()
                     args.audio = audio_path

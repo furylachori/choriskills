@@ -6,7 +6,7 @@ Convert speech to text using StepFun's ASR API.
 
 ```bash
 # Set your API key
-export STEP_FUN_API_KEY="your-key-here"
+export STEPFUN_API_KEY="your-key-here"
 
 # Transcribe audio
 python stepfun_asr.py transcribe --file audio.mp3

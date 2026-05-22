@@ -6,7 +6,7 @@ Generate and edit images using StepFun's Image API.
 
 ```bash
 # Set your API key
-export STEP_FUN_API_KEY="your-key-here"
+export STEPFUN_API_KEY="your-key-here"
 
 # Generate an image
 python stepfun_image.py generate --prompt "A cat in a hat"

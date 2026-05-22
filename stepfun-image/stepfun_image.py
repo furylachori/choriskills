@@ -15,7 +15,7 @@ Usage:
     python stepfun_image.py generate --prompt "A cat wearing a hat" --size 768x1360 --steps 12 --seed 42
 
 Environment:
-    STEP_FUN_API_KEY - Required. Your StepFun API key.
+    STEPFUN_API_KEY - Required. Your StepFun API key.
 """
 
 import argparse
@@ -41,7 +41,7 @@ SIZE_RE = re.compile(r'^\d+x\d+$')
 HTTP_TIMEOUT = 60
 
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
-API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
+API_KEY = os.environ.get("STEPFUN_API_KEY", "")
 
 
 def validate_api_base():
@@ -320,7 +320,7 @@ def check_prompt_injection(text):
 def call_api(endpoint, data=None, files=None):
     """Make an API call to StepFun."""
     if not API_KEY:
-        print("Error: STEP_FUN_API_KEY environment variable is not set.", file=sys.stderr)
+        print("Error: STEPFUN_API_KEY environment variable is not set.", file=sys.stderr)
         sys.exit(EXIT_AUTH_ERROR)
 
     url = f"{API_URL}/{endpoint}"

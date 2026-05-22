@@ -81,18 +81,18 @@ Saved automatically to `$OUTPUT_DIR` as MP3.
 Before running, set the required environment variable:
 
 ```bash
-export STEP_FUN_API_KEY="your-api-key-here"
+export STEPFUN_API_KEY="your-api-key-here"
 ```
 
 Or create a `.env` file in the skill directory:
 ```
-STEP_FUN_API_KEY=your-api-key-here
+STEPFUN_API_KEY=your-api-key-here
 ```
 
 ## Troubleshooting
 
 - **"Text must be 1–1000 characters"** — shorten or split your text
-- **"API key not set"** — add `STEP_FUN_API_KEY` to your environment
+- **"API key not set"** — add `STEPFUN_API_KEY` to your environment
 - **"Speed must be between 0.5 and 2.0"** — check `--speed` value
 - **"Volume must be between 0.0 and 2.0"** — check `--volume` value
 - **"pronunciation-map must be a valid JSON string"** — verify JSON syntax
