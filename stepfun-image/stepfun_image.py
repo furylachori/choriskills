@@ -32,6 +32,28 @@ import uuid
 from datetime import datetime
 
 
+def _load_env_file():
+    """Load environment variables from `.env` file in the script's directory."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    env_path = os.path.join(script_dir, '.env')
+    if not os.path.isfile(env_path):
+        return
+    with open(env_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' not in line:
+                continue
+            key, _, value = line.partition('=')
+            key = key.strip()
+            value = value.strip()
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+
+_load_env_file()
+
+
 ALLOWED_SCHEMES = {"https"}
 ALLOWED_HOSTS = {"api.stepfun.ai"}
 ALLOWED_HOST_SUFFIXES = {".aliyuncs.com"}  # Alibaba Cloud OSS (StepFun image hosting)
