@@ -11,7 +11,7 @@ claw-skills/
 ├── TECHNICAL_REFERENCE.md           # Full API specs, error codes, rate limits
 ├── CONTRIBUTING.md                  # How to add new skills
 ├── LICENSE                          # MIT License
-├── TEST_ALL.sh                      # Run all unit tests
+├── TEST_ALL                         # Run all unit tests
 ├── pytest.ini                       # Pytest configuration
 ├── .env.example                     # Environment variable template
 ├── .gitignore
@@ -21,21 +21,21 @@ claw-skills/
 │   ├── README.md
 │   ├── SKILL.md
 │   ├── stepfun_image.py
-│   └── TEST.sh
+│   └── TEST
 ├── stepfun-tts/                     # Skill: Text-to-speech
 │   ├── .env.example
 │   ├── main.py
 │   ├── README.md
 │   ├── SKILL.md
 │   ├── stepfun_tts.py
-│   └── TEST.sh
+│   └── TEST
 ├── stepfun-asr/                     # Skill: Speech recognition
 │   ├── .env.example
 │   ├── main.py
 │   ├── README.md
 │   ├── SKILL.md
 │   ├── stepfun_asr.py
-│   └── TEST.sh
+│   └── TEST
 └── tests/                           # Unit + integration tests
     ├── test_stepfun_image.py
     ├── test_stepfun_tts.py
@@ -53,7 +53,7 @@ claw-skills/
 
 2. Validate the installation (no API key required):
    ```bash
-   bash TEST_ALL.sh
+   bash TEST_ALL
    ```
 
 3. Set your API key and run a skill:
@@ -69,7 +69,7 @@ claw-skills/
 PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" pytest tests/ -v -k "not integration"
 
 # Or use the test runner script
-bash TEST_ALL.sh
+bash TEST_ALL
 
 # Specific module
 PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" pytest tests/test_stepfun_image.py -v -k "not integration"

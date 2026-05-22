@@ -20,7 +20,7 @@ python main.py generate --prompt "A cat in a hat"
 Quick test to verify the skill works (no API key required):
 
 ```bash
-./TEST.sh
+./TEST
 ```
 
 ## Files

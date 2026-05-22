@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `main.py` standardized entry point for each skill (framework compatibility)
-- `TEST.sh` per-skill validation scripts (no API key required)
-- `TEST_ALL.sh` root-level test runner
+- `TEST` per-skill validation scripts (no API key required)
+- `TEST_ALL` root-level test runner
 - `pytest.ini` with integration marker registration
 - Skill-level `README.md` with quick start instructions
 - Exit code constants for programmatic error handling (EXIT_INPUT_ERROR=2, EXIT_AUTH_ERROR=3, etc.)

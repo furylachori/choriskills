@@ -12,21 +12,21 @@ claw-skills/
 │   ├── README.md
 │   ├── SKILL.md
 │   ├── stepfun_image.py
-│   └── TEST.sh
+│   └── TEST
 ├── stepfun-tts/                  # Text-to-speech skill
 │   ├── .env.example
 │   ├── main.py
 │   ├── README.md
 │   ├── SKILL.md
 │   ├── stepfun_tts.py
-│   └── TEST.sh
+│   └── TEST
 ├── stepfun-asr/                  # Speech recognition skill
 │   ├── .env.example
 │   ├── main.py
 │   ├── README.md
 │   ├── SKILL.md
 │   ├── stepfun_asr.py
-│   └── TEST.sh
+│   └── TEST
 ├── tests/                        # Unit tests
 │   ├── test_stepfun_image.py
 │   ├── test_stepfun_tts.py
@@ -37,7 +37,7 @@ claw-skills/
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md
 ├── LICENSE
-├── TEST_ALL.sh
+├── TEST_ALL
 ├── pytest.ini
 └── .env.example
 ```

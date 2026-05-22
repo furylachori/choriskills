@@ -20,7 +20,7 @@ python main.py transcribe --file audio.mp3
 Quick test to verify the skill works (no API key required):
 
 ```bash
-./TEST.sh
+./TEST
 ```
 
 ## Files
