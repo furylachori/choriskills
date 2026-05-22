@@ -92,18 +92,11 @@ STEP_FUN_API_KEY=your-api-key-here
 
 ### Output Format
 
-The script prints the **absolute file path** to **stdout**. This is the only output on stdout — all metadata goes to stderr (when `--verbose` is used).
-
-Example stdout:
+The script prints a status message with the output file path to **stdout**:
 ```
-/Users/dastua/.zeroclaw/workspace/output/generate_a_cat_20250621_123456.png
+Image generated: /Users/dastua/.zeroclaw/workspace/output/generate_a_cat_20250621_123456.png
 ```
-
-This allows agents to reliably capture the output file path using stdout parsing.
-
-```
-Image generated: /Users/dastua/.zeroclaw/workspace/output/generate_a_serene_alpine_lake_20250621_123456.png
-```
+Agents can extract the path by taking the last whitespace-delimited token, or by parsing after the colon.
 
 The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/workspace/output`). No need to specify a filename.
 

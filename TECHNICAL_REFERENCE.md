@@ -93,7 +93,9 @@ Note: Edit endpoint only returns `url`, not `b64_json`. Download from URL.
 }
 ```
 
-**Response:** Raw audio binary (or JSON with `url` if `return_url=true`).
+**Response:** 
+- `return_url=false`: Raw audio binary
+- `return_url=true`: JSON with signed URL — handles both `{"url": "..."}` and `{"data": {"url": "..."}}` shapes
 
 **Parameters:**
 | Parameter | Type | Default | Notes |
@@ -106,6 +108,8 @@ Note: Edit endpoint only returns `url`, not `b64_json`. Download from URL.
 | `volume` | float | 1.0 | Volume gain (0.0-2.0) |
 | `sample_rate` | int | 24000 | Output sample rate in Hz |
 | `stream_format` | string | `audio` | Stream chunk format (audio or sse) |
+| `voice_label` | string | none | Pronunciation guidance label |
+| `pronunciation_map` | JSON | none | Phonetic overrides (max depth 10, 1000 keys) |
 
 > **Note:** `return_url=true` generates a temporary URL valid for **12 hours**. The URL is signed and expires after that window.
 
@@ -122,26 +126,28 @@ Note: Edit endpoint only returns `url`, not `b64_json`. Download from URL.
       "transcription": {
         "model": "stepaudio-2.5-asr",
         "language": "en",
-        "enable_itn": true
+        "enable_itn": true,
+        "hotwords": ["word1", "word2"],
+        "prompt": "context prompt"
       },
       "format": {
-        "type": "mp3",
-        "rate": 16000,
-        "bits": 16,
-        "channel": 1
+        "type": "mp3"
       }
     }
   }
 }
 ```
 
+Note: For PCM format, include rate, bits, and channel: `{"type": "pcm", "rate": 16000, "bits": 16, "channel": 1}`
+For container formats (mp3, wav, ogg), only the "type" field is sent.
+
 **Parameters:**
 | Parameter | Type | Default | Notes |
 |---|---|---|---|
 | `language` | string | `en` | `en` or `zh` |
 | `format` (override) | string | auto-detected | Override MIME type: `mp3`, `wav`, `ogg`, `pcm`, `flac` |
-| `hotwords` | array | none | Boost recognition for specific terms |
-| `prompt` | string | none | Context prompt (pro model only) |
+| `hotwords` | array | none | Boost recognition for specific terms (alphanumeric + spaces/hyphens, max 50 chars each) |
+| `prompt` | string | none | Context prompt (requires stepaudio-2.5-asr-pro model) |
 
 > **Note:** `prompt` and `hotwords` require the `stepaudio-2.5-asr-pro` model. The standard model ignores these fields.
 

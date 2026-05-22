@@ -7,37 +7,74 @@ Reusable skills for zeroclaw agents.
 ```
 claw-skills/
 ├── README.md                        # This file
+├── CHANGELOG.md                     # Version history
 ├── TECHNICAL_REFERENCE.md           # Full API specs, error codes, rate limits
 ├── CONTRIBUTING.md                  # How to add new skills
 ├── LICENSE                          # MIT License
+├── TEST_ALL.sh                      # Run all unit tests
+├── pytest.ini                       # Pytest configuration
 ├── .env.example                     # Environment variable template
 ├── .gitignore
-├── stepfun-image/                    # Skill: Generate and edit images from text
+├── stepfun-image/                   # Skill: Generate and edit images
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
+│   ├── SKILL.md
 │   ├── stepfun_image.py
-│   └── SKILL.md
-├── stepfun-tts/                     # StepFun Text-to-Speech skill
+│   └── TEST.sh
+├── stepfun-tts/                     # Skill: Text-to-speech
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
 │   ├── SKILL.md
-│   └── stepfun_tts.py
-├── stepfun-asr/                     # StepFun Speech Recognition skill
+│   ├── stepfun_tts.py
+│   └── TEST.sh
+├── stepfun-asr/                     # Skill: Speech recognition
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
 │   ├── SKILL.md
-│   └── stepfun_asr.py
-
-└── tests/                           # Unit tests for all skills
+│   ├── stepfun_asr.py
+│   └── TEST.sh
+└── tests/                           # Unit + integration tests
     ├── test_stepfun_image.py
     ├── test_stepfun_tts.py
-    └── test_stepfun_asr.py
+    ├── test_stepfun_asr.py
+    └── test_live_integration.py
 ```
+
+## Quick Start
+
+1. Copy the environment template and add your API key:
+   ```bash
+   cp .env.example .env
+   # Edit .env and set STEP_FUN_API_KEY=your-key-here
+   ```
+
+2. Validate the installation (no API key required):
+   ```bash
+   bash TEST_ALL.sh
+   ```
+
+3. Set your API key and run a skill:
+   ```bash
+   export STEP_FUN_API_KEY="your-key-here"
+   cd stepfun-image && python main.py generate --prompt "A cat"
+   ```
 
 ## Running Tests
 
 ```bash
-# All tests
-pytest tests/ -v
+# All unit tests (no API key required)
+PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" pytest tests/ -v -k "not integration"
+
+# Or use the test runner script
+bash TEST_ALL.sh
 
 # Specific module
-pytest tests/test_stepfun_image.py -v
-pytest tests/test_stepfun_tts.py -v
-pytest tests/test_stepfun_asr.py -v
+PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" pytest tests/test_stepfun_image.py -v -k "not integration"
+PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" pytest tests/test_stepfun_tts.py -v -k "not integration"
+PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" pytest tests/test_stepfun_asr.py -v -k "not integration"
 
 ```
 
@@ -65,7 +102,7 @@ pytest tests/ -v
 ### Running unit tests only (skipping live tests)
 
 ```bash
-pytest tests/ -v -k "not Integration"
+pytest tests/ -v -k "not integration"
 ```
 
 ### Requirements
@@ -81,7 +118,8 @@ pytest tests/ -v -k "not Integration"
 | `test_live_image_generation` | PNG output, valid signature, size > 0 < 50MB |
 | `test_live_image_edit` | Edit from a generated base image, valid PNG output |
 | `test_live_tts_mp3` | MP3 output, valid header, size > 1KB |
-| `test_live_tts_wav_format` | WAV output format works correctly |
+| `test_live_tts_return_url` | TTS with return_url flag, downloads from signed URL |
+| `test_live_tts_with_instruction` | TTS with emotion instruction parameter |
 
 ## Script Conventions
 
@@ -116,3 +154,5 @@ All scripts require:
 Optional:
 - `OUTPUT_DIR` — Output directory (default: `~/.zeroclaw/workspace/output`)
 - `STEPFUN_API_BASE` — Override API base URL (default: `https://api.stepfun.ai/step_plan/v1`)
+
+Note: The files endpoint (`/v1/files`) always uses the open platform base URL (`/v1`), not `step_plan/v1`, regardless of this setting.

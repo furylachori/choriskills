@@ -40,21 +40,13 @@ MP3, WAV, OGG, PCM, FLAC — auto-detected from file extension.
 
 ### Output Format
 
-The script prints the **absolute file path** to **stdout**. This is the only output on stdout — all metadata goes to stderr (when `--verbose` is used).
-
-Example stdout:
-```
-/Users/dastua/.zeroclaw/workspace/output/asr_transcript_20250621_123456.txt
-```
-
-This allows agents to reliably capture the output file path using stdout parsing.
-
+The script prints a status line to **stdout**:
 ```
 Transcript: /Users/dastua/.zeroclaw/workspace/output/asr_transcript_20250621_123456.txt
-This is the real end. We are going to make it now.
 ```
+The transcript text is printed to **stderr** when `--verbose` is used, or to **stdout** when `--print-transcript` is used. Without either flag, only the file path line appears on stdout.
 
-The transcript is saved as a text file and printed to the screen.
+Extract the file path from the last whitespace-delimited token or after the colon in the stdout line.
 
 ## Troubleshooting
 

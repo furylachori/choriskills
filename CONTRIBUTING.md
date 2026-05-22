@@ -7,23 +7,39 @@ Thank you for your interest in contributing! This document outlines the process 
 ```
 claw-skills/
 ├── stepfun-image/                # Image generation & edit skill
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
+│   ├── SKILL.md
 │   ├── stepfun_image.py
-│   └── SKILL.md
-├── stepfun-tts/                # Text-to-speech skill
+│   └── TEST.sh
+├── stepfun-tts/                  # Text-to-speech skill
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
 │   ├── SKILL.md
-│   └── stepfun_tts.py
-├── stepfun-asr/                # Speech recognition skill
+│   ├── stepfun_tts.py
+│   └── TEST.sh
+├── stepfun-asr/                  # Speech recognition skill
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
 │   ├── SKILL.md
-│   └── stepfun_asr.py
-├── tests/                      # Unit tests
+│   ├── stepfun_asr.py
+│   └── TEST.sh
+├── tests/                        # Unit tests
 │   ├── test_stepfun_image.py
 │   ├── test_stepfun_tts.py
-│   └── test_stepfun_asr.py
+│   ├── test_stepfun_asr.py
+│   └── test_live_integration.py
 ├── README.md
 ├── TECHNICAL_REFERENCE.md
 ├── CONTRIBUTING.md
+├── CHANGELOG.md
 ├── LICENSE
-└── .gitignore
+├── TEST_ALL.sh
+├── pytest.ini
+└── .env.example
 ```
 
 ## Adding a New Skill
@@ -85,6 +101,14 @@ test: add boundary tests for prompt validation
 - [ ] HTTP timeouts on all network calls
 - [ ] Response size limits enforced
 - [ ] Input validation (ranges, formats, lengths)
+- [ ] SSRF protection: host whitelist + OSS suffix + redirect re-validation
+- [ ] Symlink prevention: O_NOFOLLOW on file opens + realpath validation
+- [ ] SSE limits: buffer cap (10MB) + wall-clock timeout (120s) for streaming
+- [ ] Disk space check before writes
+- [ ] Magic byte validation for input files (ASR)
+- [ ] Prompt injection detection on text inputs
+- [ ] CRLF injection prevention in multipart form-data
+- [ ] JSON depth/size limits for nested parameters
 - [ ] Tests cover error paths and boundaries
 - [ ] Documentation updated
 

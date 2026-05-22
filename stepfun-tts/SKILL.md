@@ -68,18 +68,11 @@ python stepfun_tts.py --text "Welcome to Desampa" --voice elegantgentle-female -
 
 ### Output Format
 
-The script prints the **absolute file path** to **stdout**. This is the only output on stdout — all metadata goes to stderr (when `--verbose` is used).
-
-Example stdout:
-```
-/Users/dastua/.zeroclaw/workspace/output/tts_lively_girl_20250621_123456.mp3
-```
-
-This allows agents to reliably capture the output file path using stdout parsing.
-
+The script prints a status message to **stdout**:
 ```
 Audio generated: /Users/dastua/.zeroclaw/workspace/output/tts_lively_girl_20250621_123456.mp3
 ```
+Extract the file path from the last whitespace-delimited token or after the colon.
 
 Saved automatically to `$OUTPUT_DIR` as MP3.
 
