@@ -19,6 +19,8 @@ import os
 import re
 import sys
 import tempfile
+import time
+import unicodedata
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -41,6 +43,42 @@ EXIT_FILE_ERROR = 7       # Disk full, permission denied, I/O failures
 
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
 API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
+
+
+def _urlopen_with_retry(req, timeout, max_retries=2):
+    """Open URL with retry logic for transient failures."""
+    for attempt in range(max_retries + 1):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
+                delay = 2 ** attempt
+                ra = e.headers.get('Retry-After', str(delay))
+                try:
+                    delay = float(ra)
+                except ValueError:
+                    pass
+                print(f"Retrying after {delay:.1f}s (attempt {attempt+1}/{max_retries}, HTTP {e.code})", file=sys.stderr)
+                time.sleep(delay)
+            else:
+                raise
+        except urllib.error.URLError as e:
+            if attempt < max_retries:
+                print(f"Retrying after {2**attempt:.1f}s (attempt {attempt+1}/{max_retries}, network error)", file=sys.stderr)
+                time.sleep(2 ** attempt)
+            else:
+                raise
+    raise RuntimeError("Unreachable")
+
+
+def check_disk_space(path, required_bytes=100 * 1024 * 1024):
+    """Check if there's enough disk space. Returns True if ok."""
+    try:
+        stat = os.statvfs(os.path.dirname(os.path.abspath(path)))
+        available = stat.f_bavail * stat.f_frsize
+        return available >= required_bytes
+    except OSError:
+        return True  # Can't check, proceed anyway
 
 
 def validate_api_base():
@@ -85,8 +123,16 @@ def validate_output_dir():
 
 def get_output_dir():
     """Get OUTPUT_DIR from environment or use default."""
-    validate_output_dir()
-    return os.environ.get("OUTPUT_DIR", os.path.expanduser("~/.zeroclaw/workspace/output"))
+    output_dir = os.environ.get("OUTPUT_DIR")
+    if output_dir:
+        validate_output_dir()
+        return output_dir
+    # Default: use HOME or fail with clear error
+    home = os.environ.get("HOME")
+    if not home:
+        print("Error: Neither OUTPUT_DIR nor HOME environment variable is set.", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+    return os.path.join(home, ".zeroclaw", "workspace", "output")
 
 
 def get_output_path(voice=None, extension="mp3"):
@@ -96,8 +142,18 @@ def get_output_path(voice=None, extension="mp3"):
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     voice_slug = voice.replace("-", "_") if voice else "default"
-    filename = f"tts_{voice_slug}_{timestamp}.{extension}"
-    return os.path.join(output_dir, filename)
+    filename = f"tts_{voice_slug}_{timestamp}_{os.getpid()}.{extension}"
+    output_path = os.path.join(output_dir, filename)
+
+    # Resolve both paths and verify output stays under output_dir (symlink attack prevention)
+    real_output_path = os.path.realpath(output_path)
+    real_output_dir = os.path.realpath(output_dir)
+    if not real_output_path.startswith(real_output_dir + os.sep) and real_output_path != real_output_dir:
+        print(f"Error: Computed output path '{output_path}' (resolved to '{real_output_path}') "
+              f"escapes the output directory '{real_output_dir}'.", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+
+    return output_path
 
 
 def sanitize_voice(voice):
@@ -127,47 +183,67 @@ def validate_url_safe(url):
 def download_url(url, output_path):
     """Download a URL safely with SSRF protection, size limit, and atomic write."""
     validate_url_safe(url)
-    
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "claw-skills/1.0"})
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
-            content_length = response.headers.get('Content-Length')
-            if content_length:
-                try:
-                    parsed_length = int(content_length)
-                except ValueError:
-                    print(f"Error: Invalid Content-Length header value: '{content_length}'", file=sys.stderr)
-                    sys.exit(1)
-                if parsed_length > MAX_RESPONSE_SIZE:
-                    print(f"Error: Response too large ({parsed_length} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
-                    sys.exit(1)
-            
-            tmp_path = output_path + ".tmp"
-            total = 0
-            try:
-                with open(tmp_path, "wb") as f:
-                    while True:
-                        chunk = response.read(8192)
-                        if not chunk:
-                            break
-                        total += len(chunk)
-                        if total > MAX_RESPONSE_SIZE:
-                            os.unlink(tmp_path)
-                            print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
-                            sys.exit(EXIT_INPUT_ERROR)
-                        f.write(chunk)
-            except OSError as e:
-                print(f"Error writing to temporary file '{tmp_path}': {e}", file=sys.stderr)
-                sys.exit(EXIT_FILE_ERROR)
+        # Block automatic redirects - validate manually
+        try:
+            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT)
+        except urllib.error.HTTPError as e:
+            if e.code in (301, 302, 303, 307, 308):
+                redirect_url = e.headers.get('Location')
+                if redirect_url:
+                    validate_url_safe(redirect_url)  # Re-validate redirect target
+                    req2 = urllib.request.Request(redirect_url, headers={"User-Agent": "claw-skills/1.0"})
+                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT)
+                else:
+                    raise
+            else:
+                raise
 
+        content_length = response.headers.get('Content-Length')
+        if content_length:
             try:
-                os.replace(tmp_path, output_path)
-            except OSError as e:
-                print(f"Error moving temporary file to '{output_path}': {e}", file=sys.stderr)
-                sys.exit(EXIT_FILE_ERROR)
+                parsed_length = int(content_length)
+            except ValueError:
+                print(f"Error: Invalid Content-Length header value: '{content_length}'", file=sys.stderr)
+                sys.exit(1)
+            if parsed_length > MAX_RESPONSE_SIZE:
+                print(f"Error: Response too large ({parsed_length} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
+                sys.exit(1)
+
+        tmp_path = output_path + ".tmp"
+        total = 0
+        try:
+            with os.fdopen(os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb') as f:
+                while True:
+                    chunk = response.read(8192)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_RESPONSE_SIZE:
+                        print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
+                        raise OSError("response too large")
+                    f.write(chunk)
+            os.replace(tmp_path, output_path)
+        except FileExistsError:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            print(f"Error: Temporary file '{tmp_path}' already exists (possible symlink attack).", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
+        except OSError as e:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            print(f"Error writing/moving output to '{output_path}': {e}", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
     except urllib.error.HTTPError as e:
-        print(f"Error downloading from URL: HTTP {e.code}", file=sys.stderr)
-        sys.exit(1)
+        error_body = e.read().decode()
+        if len(error_body) > 200:
+            error_msg = error_body[:200] + "... (truncated)"
+        else:
+            error_msg = error_body
+        print(f"Error downloading from URL: HTTP {e.code}: {error_msg}", file=sys.stderr)
+        sys.exit(EXIT_API_ERROR)
     except urllib.error.URLError as e:
         print(f"Error downloading from URL: {e.reason}", file=sys.stderr)
         sys.exit(EXIT_NETWORK_ERROR)
@@ -175,6 +251,10 @@ def download_url(url, output_path):
 
 def filter_markdown(text):
     """Remove markdown formatting syntax from text."""
+    # Normalize Unicode to prevent homoglyph/RTL bypasses
+    text = unicodedata.normalize('NFKC', text)
+    # Remove control characters except whitespace
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
     # Remove code blocks
     text = re.sub(r'```[\s\S]*?```', '', text)
     # Remove inline code
@@ -197,6 +277,46 @@ def filter_markdown(text):
     return text
 
 
+def sanitize_text(text, max_len=1000):
+    """Remove null bytes and control characters."""
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    return text[:max_len]
+
+
+def check_prompt_injection(text):
+    """Detect common prompt injection patterns."""
+    injection_patterns = [
+        r'ignore\s+(all\s+)?previous\s+instructions?',
+        r'you\s+are\s+now',
+        r'system\s+prompt',
+        r'new\s+instructions?',
+        r'disregard\s+previous',
+        r'override\s+',
+    ]
+    text_lower = text.lower()
+    for pattern in injection_patterns:
+        if re.search(pattern, text_lower):
+            print(f"Warning: Potential prompt injection detected in input text.", file=sys.stderr)
+            return True
+    return False
+
+
+def validate_json_depth(obj, max_depth=10, max_keys=1000):
+    """Validate JSON object depth and size to prevent DoS."""
+    if isinstance(obj, dict):
+        if len(obj) > max_keys:
+            raise ValueError(f"pronunciation_map has too many keys ({len(obj)} > {max_keys})")
+        for v in obj.values():
+            validate_json_depth(v, max_depth - 1, max_keys)
+    elif isinstance(obj, list):
+        if len(obj) > max_keys:
+            raise ValueError(f"pronunciation_map list too large ({len(obj)} > {max_keys})")
+        for item in obj:
+            validate_json_depth(item, max_depth - 1, max_keys)
+    if max_depth <= 0:
+        raise ValueError("pronunciation_map exceeds maximum nesting depth")
+
+
 def text_to_speech(args):
     """Convert text to speech using StepFun TTS."""
     api_key = os.environ.get("STEP_FUN_API_KEY", "")
@@ -204,8 +324,17 @@ def text_to_speech(args):
         print("Error: STEP_FUN_API_KEY environment variable is not set.", file=sys.stderr)
         sys.exit(EXIT_AUTH_ERROR)
 
-    if not args.text or len(args.text) < 1 or len(args.text) > 1000:
-        print(f"Error: Text must be 1-1000 characters (got {len(args.text) if args.text else 0}).", file=sys.stderr)
+    # Sanitize text input
+    args_text = sanitize_text(args.text, 1000)
+    if not args_text:
+        print("Error: Text is empty after sanitization.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if check_prompt_injection(args_text):
+        print(f"Warning: Proceeding with potentially adversarial input.", file=sys.stderr)
+
+    if not args_text or len(args_text) < 1 or len(args_text) > 1000:
+        print(f"Error: Text must be 1-1000 characters (got {len(args_text) if args_text else 0}).", file=sys.stderr)
         sys.exit(EXIT_INPUT_ERROR)
 
     # Validate ranges
@@ -221,7 +350,7 @@ def text_to_speech(args):
         print(f"Error: Sample rate must be a positive integer (got {args.sample_rate}).", file=sys.stderr)
         sys.exit(EXIT_INPUT_ERROR)
 
-    text = args.text
+    text = args_text
     if args.markdown_filter:
         text = filter_markdown(text)
         if not text or len(text) > 1000:
@@ -246,17 +375,18 @@ def text_to_speech(args):
         data["stream_format"] = args.stream_format
 
     if args.instruction:
-        data["instruction"] = args.instruction
+        data["instruction"] = sanitize_text(args.instruction, 500)
 
     if args.voice_label:
-        data["voice_label"] = args.voice_label
+        data["voice_label"] = sanitize_text(args.voice_label, 200)
 
     if args.pronunciation_map:
         try:
             pronunciation_map = json.loads(args.pronunciation_map)
+            validate_json_depth(pronunciation_map)
             data["pronunciation_map"] = pronunciation_map
-        except json.JSONDecodeError:
-            print(f"Error: --pronunciation-map must be a valid JSON string.", file=sys.stderr)
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Error: --pronunciation-map: {e}", file=sys.stderr)
             sys.exit(EXIT_INPUT_ERROR)
 
     url = f"{API_URL}/audio/speech"
@@ -268,36 +398,57 @@ def text_to_speech(args):
     req = urllib.request.Request(url, data=json.dumps(data).encode(), headers=headers, method="POST")
 
     try:
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
+        with _urlopen_with_retry(req, timeout=HTTP_TIMEOUT) as response:
             content_type = response.headers.get('content-type', '')
             
             if 'application/json' in content_type:
-                result = json.loads(response.read().decode())
+                try:
+                    result = json.loads(response.read().decode())
+                except json.JSONDecodeError:
+                    print(f"Error: Invalid JSON response from TTS API", file=sys.stderr)
+                    sys.exit(EXIT_API_ERROR)
                 if 'url' in result:
                     download_url(result['url'], output_path)
                 elif 'data' in result and 'url' in result['data']:
                     download_url(result['data']['url'], output_path)
                 else:
                     print(f"Error: Expected URL in response but got neither 'url' nor 'data.url'. Response: {result}", file=sys.stderr)
-                    sys.exit(1)
+                    sys.exit(EXIT_API_ERROR)
             else:
-                audio_data = response.read()
+                audio_data = b""
+                consecutive_empty = 0
+                max_empty = 3
+                while True:
+                    chunk = response.read(8192)
+                    if not chunk:
+                        consecutive_empty += 1
+                        if consecutive_empty >= max_empty:
+                            break
+                        continue
+                    consecutive_empty = 0
+                    audio_data += chunk
+                    if len(audio_data) > MAX_RESPONSE_SIZE:
+                        print(f"Error: Audio data too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
+                        sys.exit(EXIT_INPUT_ERROR)
                 
-                if len(audio_data) > MAX_RESPONSE_SIZE:
-                    print(f"Error: Audio data too large ({len(audio_data)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
-                    sys.exit(EXIT_INPUT_ERROR)
+                if not check_disk_space(output_path, len(audio_data) + 10 * 1024 * 1024):
+                    print("Error: Insufficient disk space for output file.", file=sys.stderr)
+                    sys.exit(EXIT_FILE_ERROR)
                 
                 tmp_path = output_path + ".tmp"
                 try:
-                    with open(tmp_path, "wb") as f:
+                    with os.fdopen(os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb') as f:
                         f.write(audio_data)
-                except OSError as e:
-                    print(f"Error writing audio to temporary file '{tmp_path}': {e}", file=sys.stderr)
-                    sys.exit(EXIT_FILE_ERROR)
-                try:
                     os.replace(tmp_path, output_path)
+                except FileExistsError:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                    print(f"Error: Temporary file '{tmp_path}' already exists (possible symlink attack).", file=sys.stderr)
+                    sys.exit(EXIT_FILE_ERROR)
                 except OSError as e:
-                    print(f"Error moving temporary file to '{output_path}': {e}", file=sys.stderr)
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                    print(f"Error writing audio to temporary file '{tmp_path}': {e}", file=sys.stderr)
                     sys.exit(EXIT_FILE_ERROR)
             
             print(f"Audio generated: {output_path}")
@@ -309,10 +460,9 @@ def text_to_speech(args):
             return output_path
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
-        try:
-            error_data = json.loads(error_body)
-            error_msg = error_data.get('error', error_body)
-        except json.JSONDecodeError:
+        if len(error_body) > 200:
+            error_msg = error_body[:200] + "... (truncated)"
+        else:
             error_msg = error_body
         print(f"TTS API Error ({e.code}): {error_msg}", file=sys.stderr)
         sys.exit(EXIT_API_ERROR)

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Run all unit tests for the entire claw-skills repository
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=========================================="
+echo "  Testing all claw-skills"
+echo "=========================================="
+echo ""
+
+PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" python3 -m pytest \
+  tests/ -v -k "not Integration"
+
+echo ""
+echo "=========================================="
+echo "  All tests passed!"
+echo "=========================================="

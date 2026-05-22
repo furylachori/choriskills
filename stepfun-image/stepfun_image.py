@@ -25,8 +25,10 @@ import os
 import re
 import sys
 import tempfile
+import time
 import urllib.request
 import urllib.error
+import uuid
 from datetime import datetime
 
 
@@ -93,8 +95,16 @@ def validate_output_dir():
 
 def get_output_dir():
     """Get OUTPUT_DIR from environment or use default."""
-    validate_output_dir()
-    return os.environ.get("OUTPUT_DIR", os.path.expanduser("~/.zeroclaw/workspace/output"))
+    output_dir = os.environ.get("OUTPUT_DIR")
+    if output_dir:
+        validate_output_dir()
+        return output_dir
+    # Default: use HOME or fail with clear error
+    home = os.environ.get("HOME")
+    if not home:
+        print("Error: Neither OUTPUT_DIR nor HOME environment variable is set.", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+    return os.path.join(home, ".zeroclaw", "workspace", "output")
 
 
 def get_output_path(operation, prompt=None, extension="png"):
@@ -104,10 +114,20 @@ def get_output_path(operation, prompt=None, extension="png"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if prompt:
         slug = "".join(c if c.isalnum() else "_" for c in prompt[:30]).strip("_")
-        filename = f"{operation}_{slug}_{timestamp}.{extension}"
+        filename = f"{operation}_{slug}_{timestamp}_{os.getpid()}.{extension}"
     else:
-        filename = f"{operation}_{timestamp}.{extension}"
-    return os.path.join(output_dir, filename)
+        filename = f"{operation}_{timestamp}_{os.getpid()}.{extension}"
+    output_path = os.path.join(output_dir, filename)
+
+    # Resolve the full path and verify it is still under the validated output_dir
+    real_output_path = os.path.realpath(output_path)
+    real_output_dir = os.path.realpath(output_dir)
+    if not real_output_path.startswith(real_output_dir + os.sep) and real_output_path != real_output_dir:
+        print(f"Error: Computed output path '{output_path}' (resolved to '{real_output_path}') "
+              f"escapes the output directory '{real_output_dir}'.", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+
+    return output_path
 
 
 def sanitize_voice(voice):
@@ -167,53 +187,134 @@ def validate_input_path(input_path):
         sys.exit(EXIT_INPUT_ERROR)
 
 
+def _urlopen_with_retry(req, timeout, max_retries=2):
+    """Open URL with retry logic for transient failures."""
+    for attempt in range(max_retries + 1):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
+                delay = 2 ** attempt
+                ra = e.headers.get('Retry-After', str(delay))
+                try:
+                    delay = float(ra)
+                except ValueError:
+                    pass
+                print(f"Retrying after {delay:.1f}s (attempt {attempt+1}/{max_retries}, HTTP {e.code})", file=sys.stderr)
+                time.sleep(delay)
+            else:
+                raise
+        except urllib.error.URLError as e:
+            if attempt < max_retries:
+                print(f"Retrying after {2**attempt:.1f}s (attempt {attempt+1}/{max_retries}, network error)", file=sys.stderr)
+                time.sleep(2 ** attempt)
+            else:
+                raise
+    raise RuntimeError("Unreachable")
+
+
+def check_disk_space(path, required_bytes=100 * 1024 * 1024):
+    """Check if there's enough disk space. Returns True if ok."""
+    try:
+        stat = os.statvfs(os.path.dirname(os.path.abspath(path)))
+        available = stat.f_bavail * stat.f_frsize
+        return available >= required_bytes
+    except OSError:
+        return True  # Can't check, proceed anyway
+
+
 def download_url(url, output_path):
     """Download a URL safely with SSRF protection, size limit, and atomic write."""
     validate_url_safe(url)
-    
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "claw-skills/1.0"})
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
-            content_length = response.headers.get('Content-Length')
-            if content_length:
-                try:
-                    content_length_int = int(content_length)
-                except ValueError:
-                    print(f"Error: Non-numeric Content-Length header: '{content_length}'", file=sys.stderr)
-                    sys.exit(1)
-                if content_length_int > MAX_RESPONSE_SIZE:
-                    print(f"Error: Response too large ({content_length_int} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
-                    sys.exit(1)
-            
-            tmp_path = output_path + ".tmp"
-            total = 0
+        # Block automatic redirects - validate manually
+        try:
+            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT)
+        except urllib.error.HTTPError as e:
+            if e.code in (301, 302, 303, 307, 308):
+                redirect_url = e.headers.get('Location')
+                if redirect_url:
+                    validate_url_safe(redirect_url)  # Re-validate redirect target
+                    req2 = urllib.request.Request(redirect_url, headers={"User-Agent": "claw-skills/1.0"})
+                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT)
+                else:
+                    raise
+            else:
+                raise
+
+        content_length = response.headers.get('Content-Length')
+        if content_length:
             try:
-                with open(tmp_path, "wb") as f:
-                    while True:
-                        chunk = response.read(8192)
-                        if not chunk:
-                            break
-                        total += len(chunk)
-                        if total > MAX_RESPONSE_SIZE:
-                            os.unlink(tmp_path)
-                            print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
-                            sys.exit(EXIT_INPUT_ERROR)
-                        f.write(chunk)
-            except OSError as e:
-                print(f"Error writing to temporary file '{tmp_path}': {e}", file=sys.stderr)
-                sys.exit(EXIT_FILE_ERROR)
-            
-            try:
-                os.replace(tmp_path, output_path)
-            except OSError as e:
-                print(f"Error moving temporary file to '{output_path}': {e}", file=sys.stderr)
-                sys.exit(EXIT_FILE_ERROR)
+                content_length_int = int(content_length)
+            except ValueError:
+                print(f"Error: Non-numeric Content-Length header: '{content_length}'", file=sys.stderr)
+                sys.exit(1)
+            if content_length_int > MAX_RESPONSE_SIZE:
+                print(f"Error: Response too large ({content_length_int} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
+                sys.exit(1)
+
+        tmp_path = output_path + ".tmp"
+        total = 0
+        try:
+            with os.fdopen(os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb') as f:
+                while True:
+                    chunk = response.read(8192)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_RESPONSE_SIZE:
+                        print(f"Error: Response too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
+                        raise OSError("response too large")
+                    f.write(chunk)
+            os.replace(tmp_path, output_path)
+        except FileExistsError:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            print(f"Error: Temporary file '{tmp_path}' already exists (possible symlink attack).", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
+        except OSError as e:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            print(f"Error writing/moving output to '{output_path}': {e}", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
     except urllib.error.HTTPError as e:
-        print(f"Error downloading from URL: HTTP {e.code}", file=sys.stderr)
-        sys.exit(1)
+        error_body = e.read().decode()
+        if len(error_body) > 200:
+            error_msg = error_body[:200] + "... (truncated)"
+        else:
+            error_msg = error_body
+        print(f"Error downloading from URL: HTTP {e.code}: {error_msg}", file=sys.stderr)
+        sys.exit(EXIT_API_ERROR)
     except urllib.error.URLError as e:
         print(f"Error downloading from URL: {e.reason}", file=sys.stderr)
         sys.exit(EXIT_NETWORK_ERROR)
+
+
+def escape_crlf(s):
+    """Prevent CRLF injection in multipart form data."""
+    if isinstance(s, str):
+        return s.replace('\r', '%0D').replace('\n', '%0A')
+    return s
+
+
+def check_prompt_injection(text):
+    """Detect common prompt injection patterns."""
+    injection_patterns = [
+        r'ignore\s+(all\s+)?previous\s+instructions?',
+        r'you\s+are\s+now',
+        r'system\s+prompt',
+        r'new\s+instructions?',
+        r'disregard\s+previous',
+        r'override\s+',
+    ]
+    text_lower = text.lower()
+    for pattern in injection_patterns:
+        if re.search(pattern, text_lower):
+            print(f"Warning: Potential prompt injection detected in image prompt.", file=sys.stderr)
+            return True
+    return False
 
 
 def call_api(endpoint, data=None, files=None):
@@ -227,21 +328,22 @@ def call_api(endpoint, data=None, files=None):
 
     if files:
         import mimetypes
-        boundary = "----FormBoundary7MA4YWxkTrZu0gW"
+        boundary = f"----FormBoundary{uuid.uuid4().hex[:16]}"
         
         body = b""
         for key, value in data.items():
             body += f"--{boundary}\r\n".encode()
-            body += f'Content-Disposition: form-data; name="{key}"\r\n\r\n'.encode()
-            body += f"{value}\r\n".encode()
+            body += f'Content-Disposition: form-data; name="{escape_crlf(key)}"\r\n\r\n'.encode()
+            body += f"{escape_crlf(str(value))}\r\n".encode()
         
         for file_key, file_path in files.items():
             filename = os.path.basename(file_path)
             mime_type = mimetypes.guess_type(filename)[0] or "image/png"
-            with open(file_path, "rb") as f:
+            fd = os.open(file_path, os.O_RDONLY | os.O_NOFOLLOW)
+            with os.fdopen(fd, 'rb') as f:
                 file_data = f.read()
             body += f"--{boundary}\r\n".encode()
-            body += f'Content-Disposition: form-data; name="{file_key}"; filename="{filename}"\r\n'.encode()
+            body += f'Content-Disposition: form-data; name="{escape_crlf(file_key)}"; filename="{escape_crlf(filename)}"\r\n'.encode()
             body += f"Content-Type: {mime_type}\r\n\r\n".encode()
             body += file_data + b"\r\n"
         
@@ -254,14 +356,17 @@ def call_api(endpoint, data=None, files=None):
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
     
     try:
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
-            return json.loads(response.read().decode())
+        with _urlopen_with_retry(req, timeout=HTTP_TIMEOUT) as response:
+            try:
+                return json.loads(response.read().decode())
+            except json.JSONDecodeError:
+                print(f"Error: Invalid JSON response from API", file=sys.stderr)
+                sys.exit(EXIT_API_ERROR)
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
-        try:
-            error_data = json.loads(error_body)
-            error_msg = error_data.get("error", error_body)
-        except json.JSONDecodeError:
+        if len(error_body) > 200:
+            error_msg = error_body[:200] + "... (truncated)"
+        else:
             error_msg = error_body
         print(f"API Error ({e.code}): {error_msg}", file=sys.stderr)
         sys.exit(EXIT_API_ERROR)
@@ -307,8 +412,14 @@ def generate_image(args):
         print("Error: Expected b64_json in response", file=sys.stderr)
         sys.exit(1)
 
+    b64_string = image_data["b64_json"]
+    # Estimate decoded size (base64 expands by ~4/3)
+    estimated_size = len(b64_string) * 3 // 4
+    if estimated_size > MAX_RESPONSE_SIZE:
+        print(f"Error: Image data too large (estimated {estimated_size} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
     try:
-        image_bytes = base64.b64decode(image_data["b64_json"])
+        image_bytes = base64.b64decode(b64_string)
     except Exception as e:
         print(f"Error decoding base64 image data: {e}", file=sys.stderr)
         sys.exit(1)
@@ -317,17 +428,24 @@ def generate_image(args):
         print(f"Error: Image data too large ({len(image_bytes)} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
         sys.exit(EXIT_INPUT_ERROR)
     
+    if not check_disk_space(args.output, len(image_bytes) + 10 * 1024 * 1024):
+        print("Error: Insufficient disk space for output file.", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+    
     tmp_path = args.output + ".tmp"
     try:
-        with open(tmp_path, "wb") as f:
+        with os.fdopen(os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb') as f:
             f.write(image_bytes)
-    except OSError as e:
-        print(f"Error writing image to temporary file '{tmp_path}': {e}", file=sys.stderr)
-        sys.exit(EXIT_FILE_ERROR)
-    try:
         os.replace(tmp_path, args.output)
+    except FileExistsError:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        print(f"Error: Temporary file '{tmp_path}' already exists (possible symlink attack).", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
     except OSError as e:
-        print(f"Error moving temporary file to '{args.output}': {e}", file=sys.stderr)
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        print(f"Error writing image to temporary file '{tmp_path}': {e}", file=sys.stderr)
         sys.exit(EXIT_FILE_ERROR)
     
     print(f"Image generated: {args.output}")
@@ -424,6 +542,12 @@ def main():
     if not args.command:
         parser.print_help()
         sys.exit(1)
+
+    # Sanitize prompt (remove control chars)
+    args.prompt = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', args.prompt)
+
+    if check_prompt_injection(args.prompt):
+        print(f"Warning: Proceeding with potentially adversarial prompt.", file=sys.stderr)
 
     # Validate prompt length
     if len(args.prompt) < 1 or len(args.prompt) > 512:

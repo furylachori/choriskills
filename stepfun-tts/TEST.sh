@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Test script for stepfun-tts skill
+# Runs unit tests only (no API key required)
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=========================================="
+echo "  Testing stepfun-tts"
+echo "=========================================="
+echo ""
+
+PYTHONPATH="$SCRIPT_DIR:../stepfun-image:../stepfun-asr" python3 -m pytest \
+  "$SCRIPT_DIR/../tests/test_stepfun_tts.py" \
+  -v -k "not Integration"
+
+echo ""
+echo "=========================================="
+echo "  All stepfun-tts tests passed!"
+echo "=========================================="

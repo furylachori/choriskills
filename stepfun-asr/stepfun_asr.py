@@ -31,6 +31,7 @@ import mimetypes
 import os
 import re
 import sys
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -39,10 +40,48 @@ from datetime import datetime
 ALLOWED_SCHEMES = {"https"}
 ALLOWED_HOSTS = {"api.stepfun.ai"}
 MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_SSE_BUFFER = 10 * 1024 * 1024    # 10 MB max SSE buffer
+SSE_READ_TIMEOUT = 120               # 2 minute wall-clock timeout for SSE streaming
 HTTP_TIMEOUT = 60
 
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
 API_KEY = os.environ.get("STEP_FUN_API_KEY", "")
+
+
+def _urlopen_with_retry(req, timeout, max_retries=2):
+    """Open URL with retry logic for transient failures."""
+    for attempt in range(max_retries + 1):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
+                delay = 2 ** attempt
+                ra = e.headers.get('Retry-After', str(delay))
+                try:
+                    delay = float(ra)
+                except ValueError:
+                    pass
+                print(f"Retrying after {delay:.1f}s (attempt {attempt+1}/{max_retries}, HTTP {e.code})", file=sys.stderr)
+                time.sleep(delay)
+            else:
+                raise
+        except urllib.error.URLError as e:
+            if attempt < max_retries:
+                print(f"Retrying after {2**attempt:.1f}s (attempt {attempt+1}/{max_retries}, network error)", file=sys.stderr)
+                time.sleep(2 ** attempt)
+            else:
+                raise
+    raise RuntimeError("Unreachable")
+
+
+def check_disk_space(path, required_bytes=100 * 1024 * 1024):
+    """Check if there's enough disk space. Returns True if ok."""
+    try:
+        stat = os.statvfs(os.path.dirname(os.path.abspath(path)))
+        available = stat.f_bavail * stat.f_frsize
+        return available >= required_bytes
+    except OSError:
+        return True  # Can't check, proceed anyway
 
 
 def validate_api_base():
@@ -96,8 +135,16 @@ def validate_output_dir():
 
 def get_output_dir():
     """Get OUTPUT_DIR from environment or use default."""
-    validate_output_dir()
-    return os.environ.get("OUTPUT_DIR", os.path.expanduser("~/.zeroclaw/workspace/output"))
+    output_dir = os.environ.get("OUTPUT_DIR")
+    if output_dir:
+        validate_output_dir()
+        return output_dir
+    # Default: use HOME or fail with clear error
+    home = os.environ.get("HOME")
+    if not home:
+        print("Error: Neither OUTPUT_DIR nor HOME environment variable is set.", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+    return os.path.join(home, ".zeroclaw", "workspace", "output")
 
 
 def get_output_path(extension="txt"):
@@ -105,8 +152,18 @@ def get_output_path(extension="txt"):
     output_dir = get_output_dir()
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"asr_transcript_{timestamp}.{extension}"
-    return os.path.join(output_dir, filename)
+    filename = f"asr_transcript_{timestamp}_{os.getpid()}.{extension}"
+    output_path = os.path.join(output_dir, filename)
+
+    # Resolve the full path and verify it is still under the validated output_dir
+    real_output_path = os.path.realpath(output_path)
+    real_output_dir = os.path.realpath(output_dir)
+    if not real_output_path.startswith(real_output_dir + os.sep) and real_output_path != real_output_dir:
+        print(f"Error: Computed output path '{output_path}' (resolved to '{real_output_path}') "
+              f"escapes the output directory '{real_output_dir}'.", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+
+    return output_path
 
 
 def transcribe_audio(args):
@@ -120,6 +177,17 @@ def transcribe_audio(args):
         print(f"Error: Audio file '{args.audio}' does not exist.", file=sys.stderr)
         sys.exit(EXIT_INPUT_ERROR)
 
+    if not os.path.isfile(args.audio):
+        print(f"Error: '{args.audio}' is not a regular file.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    # Resolve real path to prevent symlink attacks to sensitive system files
+    real_audio_path = os.path.realpath(args.audio)
+    sensitive_prefixes = ('/etc', '/sys', '/proc', '/dev', '/boot')
+    if any(real_audio_path.startswith(p) for p in sensitive_prefixes):
+        print(f"Error: Audio file resolves to a sensitive system path '{real_audio_path}'.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
     # Validate no path traversal in audio path
     normalized = args.audio.replace('\\', '/')
     parts = normalized.split('/')
@@ -128,8 +196,19 @@ def transcribe_audio(args):
         sys.exit(EXIT_INPUT_ERROR)
 
     # Read audio file and encode to base64
+    # Check file size before reading into memory
+    audio_size = os.path.getsize(args.audio)
+    if audio_size > MAX_RESPONSE_SIZE:
+        print(f"Error: Audio file too large ({audio_size} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
     try:
-        with open(args.audio, "rb") as f:
+        fd = os.open(args.audio, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as e:
+        print(f"Error: Could not open audio file '{args.audio}': {e}", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+    try:
+        with os.fdopen(fd, "rb") as f:
             audio_data = f.read()
     except OSError as e:
         print(f"Error: Could not read audio file '{args.audio}': {e}", file=sys.stderr)
@@ -150,6 +229,33 @@ def transcribe_audio(args):
     # Allow format override via --format
     if args.format:
         format_type = args.format
+    
+    # Validate file header matches detected format
+    MAGIC_SIGNATURES = {
+        'wav': [b'RIFF'],
+        'mp3': [b'ID3', b'\xff\xfb', b'\xff\xf3', b'\xff\xf2'],
+        'ogg': [b'OggS'],
+        'flac': [b'fLaC'],
+        'pcm': [],  # PCM has no standard magic bytes
+        'm4a': [b'\x00\x00\x00\x20ftypM4A', b'\x00\x00\x00\x18ftyp'],
+    }
+
+    try:
+        fd = os.open(args.audio, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as e:
+        print(f"Error: Could not open audio file '{args.audio}': {e}", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+    try:
+        with os.fdopen(fd, "rb") as f:
+            header = f.read(16)
+    except OSError as e:
+        print(f"Error: Could not read audio file '{args.audio}': {e}", file=sys.stderr)
+        sys.exit(EXIT_FILE_ERROR)
+
+    if format_type in MAGIC_SIGNATURES:
+        valid_magics = MAGIC_SIGNATURES[format_type]
+        if valid_magics and not any(header.startswith(m) for m in valid_magics):
+            print(f"Warning: File header does not match {format_type} format. Proceeding anyway.", file=sys.stderr)
     
     # Build format object: for container formats (wav/mp3/ogg), only send `type`
     # since rate/bits/channel are optional and may confuse the API.
@@ -180,6 +286,10 @@ def transcribe_audio(args):
 
     # Add optional hotwords as array
     if args.hotwords_list:
+        for word in args.hotwords_list:
+            if not re.match(r'^[a-zA-Z0-9\s\-]{1,50}$', word):
+                print(f"Error: hotword '{word}' contains invalid characters (only alphanumeric, spaces, hyphens allowed)", file=sys.stderr)
+                sys.exit(EXIT_INPUT_ERROR)
         body["audio"]["input"]["transcription"]["hotwords"] = args.hotwords_list
 
     prompt = getattr(args, 'prompt', None)
@@ -200,40 +310,52 @@ def transcribe_audio(args):
         final_usage = None
         done_text = None
         
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
+        with _urlopen_with_retry(req, timeout=HTTP_TIMEOUT) as response:
             buffer = b""
             max_empty_reads = 3
             empty_reads = 0
-            
+            start_time = time.time()
+
             while True:
+                if time.time() - start_time > SSE_READ_TIMEOUT:
+                    print(f"Error: SSE stream timed out after {SSE_READ_TIMEOUT} seconds", file=sys.stderr)
+                    sys.exit(EXIT_NETWORK_ERROR)
+
                 chunk = response.read(1024)
                 if not chunk:
                     empty_reads += 1
                     if empty_reads >= max_empty_reads:
                         break
                     continue
-                
+
                 empty_reads = 0
                 buffer += chunk
-                
+
+                if len(buffer) > MAX_SSE_BUFFER:
+                    print(f"Error: SSE buffer exceeded {MAX_SSE_BUFFER} bytes - possible runaway stream", file=sys.stderr)
+                    sys.exit(EXIT_NETWORK_ERROR)
+
                 while b'\n' in buffer:
                     line, buffer = buffer.split(b'\n', 1)
                     line = line.decode('utf-8', errors='replace').strip()
-                    
+
                     if not line or not line.startswith('data:'):
                         continue
-                    
+
                     data_str = line[5:].strip()
                     if data_str == '[DONE]':
                         break
-                    
+
                     try:
                         event = json.loads(data_str)
                         event_type = event.get('type', '')
-                        
+
                         if event_type == 'transcript.text.delta':
                             delta = event.get('delta', '')
                             full_text += delta
+                            if len(full_text) > 1_000_000:
+                                print("Error: Transcript text exceeded 1 MB limit", file=sys.stderr)
+                                sys.exit(EXIT_API_ERROR)
                         elif event_type == 'transcript.text.done':
                             done_text = event.get('text', '')
                             final_usage = event.get('usage')
@@ -244,33 +366,53 @@ def transcribe_audio(args):
                         continue
         
         if not full_text:
+            # Try parsing buffer as a JSON error response
+            if len(buffer) > 0 and b'data:' not in buffer:
+                try:
+                    error_data = json.loads(buffer.decode('utf-8', errors='replace'))
+                    error_msg = error_data.get('error', error_data.get('message', str(error_data)))
+                    print(f"Error: API returned error: {error_msg}", file=sys.stderr)
+                    sys.exit(EXIT_API_ERROR)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    pass
             print("Error: No transcript received from ASR service", file=sys.stderr)
             print(f"Debug: buffer size={len(buffer)}, empty_reads={empty_reads}", file=sys.stderr)
             if buffer:
                 print(f"Debug: remaining buffer: {buffer[:200]}", file=sys.stderr)
             else:
                 print("Debug: SSE stream returned zero data - endpoint may not support this audio format", file=sys.stderr)
-            sys.exit(1)
+            sys.exit(EXIT_API_ERROR)
         
         # Save transcript to file atomically
         output_path = get_output_path()
+        transcript_bytes = full_text.encode('utf-8')
+        
+        if not check_disk_space(output_path, len(transcript_bytes) + 10 * 1024 * 1024):
+            print("Error: Insufficient disk space for output file.", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
+        
         tmp_path = output_path + ".tmp"
         try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
+            with os.fdopen(os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'w', encoding="utf-8") as f:
                 f.write(full_text)
             os.replace(tmp_path, output_path)
+        except FileExistsError:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            print(f"Error: Temporary file '{tmp_path}' already exists (possible symlink attack).", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
         except OSError as e:
-            print(f"Error: Could not write transcript file: {e}", file=sys.stderr)
             # Attempt cleanup of partial temp file
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+            print(f"Error: Could not write transcript file: {e}", file=sys.stderr)
             sys.exit(EXIT_FILE_ERROR)
         
         print(f"Transcript: {output_path}")
         if args.print_transcript:
-            print(full_text)
+            print(full_text, file=sys.stdout)
         elif args.verbose:
             print(full_text, file=sys.stderr)
         
@@ -281,10 +423,9 @@ def transcribe_audio(args):
         
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
-        try:
-            error_data = json.loads(error_body)
-            error_msg = error_data.get('error', error_body)
-        except json.JSONDecodeError:
+        if len(error_body) > 200:
+            error_msg = error_body[:200] + "... (truncated)"
+        else:
             error_msg = error_body
         print(f"ASR API Error ({e.code}): {error_msg}", file=sys.stderr)
         sys.exit(EXIT_API_ERROR)
