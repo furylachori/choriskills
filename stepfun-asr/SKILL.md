@@ -58,4 +58,4 @@ Extract the file path from the last whitespace-delimited token or after the colo
 
 ## Technical Reference
 
-Full API parameters and SSE event formats: [TECHNICAL_REFERENCE.md](../TECHNICAL_REFERENCE.md)
+Full API parameters and SSE event formats are in `TECHNICAL_REFERENCE.md` at the repository root.

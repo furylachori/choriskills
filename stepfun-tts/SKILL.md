@@ -99,4 +99,4 @@ STEPFUN_API_KEY=your-api-key-here
 
 ## Technical Reference
 
-Full API parameters, response formats, and error codes: [TECHNICAL_REFERENCE.md](../TECHNICAL_REFERENCE.md)
+Full API parameters, response formats, and error codes are in `TECHNICAL_REFERENCE.md` at the repository root.

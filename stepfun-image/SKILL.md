@@ -111,4 +111,4 @@ The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/workspace/output`). No
 
 ## Technical Reference
 
-Full API parameters and response formats: [TECHNICAL_REFERENCE.md](../TECHNICAL_REFERENCE.md)
+Full API parameters and response formats are in `TECHNICAL_REFERENCE.md` at the repository root.
