@@ -386,15 +386,11 @@ def text_to_speech(args):
         "input": text,
         "voice": args.voice,
         "response_format": args.format,
-        "return_url": args.return_url,
+        "return_url": True,
         "speed": args.speed,
         "volume": args.volume,
         "sample_rate": args.sample_rate,
     }
-
-    # stream_format is mutually exclusive with return_url
-    if not args.return_url:
-        data["stream_format"] = args.stream_format
 
     if args.instruction:
         data["instruction"] = sanitize_text(args.instruction, 500)
@@ -422,57 +418,24 @@ def text_to_speech(args):
     try:
         with _urlopen_with_retry(req, timeout=HTTP_TIMEOUT) as response:
             content_type = response.headers.get('content-type', '')
-            
-            if 'application/json' in content_type:
-                try:
-                    result = json.loads(response.read().decode())
-                except json.JSONDecodeError:
-                    print(f"Error: Invalid JSON response from TTS API", file=sys.stderr)
-                    sys.exit(EXIT_API_ERROR)
-                if 'url' in result:
-                    download_url(result['url'], output_path)
-                elif 'data' in result and 'url' in result['data']:
-                    download_url(result['data']['url'], output_path)
-                else:
-                    print(f"Error: Expected URL in response but got neither 'url' nor 'data.url'. Response: {result}", file=sys.stderr)
-                    sys.exit(EXIT_API_ERROR)
-            else:
-                audio_data = b""
-                consecutive_empty = 0
-                max_empty = 3
-                while True:
-                    chunk = response.read(8192)
-                    if not chunk:
-                        consecutive_empty += 1
-                        if consecutive_empty >= max_empty:
-                            break
-                        continue
-                    consecutive_empty = 0
-                    audio_data += chunk
-                    if len(audio_data) > MAX_RESPONSE_SIZE:
-                        print(f"Error: Audio data too large (>{MAX_RESPONSE_SIZE} bytes)", file=sys.stderr)
-                        sys.exit(EXIT_INPUT_ERROR)
-                
-                if not check_disk_space(output_path, len(audio_data) + 10 * 1024 * 1024):
-                    print("Error: Insufficient disk space for output file.", file=sys.stderr)
-                    sys.exit(EXIT_FILE_ERROR)
-                
-                tmp_path = output_path + ".tmp"
-                try:
-                    with os.fdopen(os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), 'wb') as f:
-                        f.write(audio_data)
-                    os.replace(tmp_path, output_path)
-                except FileExistsError:
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
-                    print(f"Error: Temporary file '{tmp_path}' already exists (possible symlink attack).", file=sys.stderr)
-                    sys.exit(EXIT_FILE_ERROR)
-                except OSError as e:
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
-                    print(f"Error writing audio to temporary file '{tmp_path}': {e}", file=sys.stderr)
-                    sys.exit(EXIT_FILE_ERROR)
-            
+
+            if 'application/json' not in content_type:
+                print(f"Error: Expected JSON response, got '{content_type}'", file=sys.stderr)
+                sys.exit(EXIT_API_ERROR)
+
+            try:
+                result = json.loads(response.read().decode())
+            except json.JSONDecodeError:
+                print(f"Error: Invalid JSON response from TTS API", file=sys.stderr)
+                sys.exit(EXIT_API_ERROR)
+
+            url = result.get('url') or (result.get('data') or {}).get('url')
+            if not url:
+                print(f"Error: No URL in response: {result}", file=sys.stderr)
+                sys.exit(EXIT_API_ERROR)
+
+            download_url(url, output_path)
+
             print(f"Audio generated: {output_path}")
             if args.verbose:
                 if 'voice' in data:
@@ -501,8 +464,6 @@ def main():
     parser.add_argument("--instruction", default=None, help="Emotion/style instruction (e.g., 'happy, upbeat')")
     parser.add_argument("--verbose", action="store_true", help="Print metadata to stderr")
 
-    parser.add_argument("--return-url", action="store_true", default=False,
-                        help="Request URL return instead of binary audio")
     parser.add_argument("--speed", type=float, default=1.0,
                         help="Playback speed multiplier (range: 0.5-2.0, default: 1.0)")
     parser.add_argument("--volume", type=float, default=1.0,
@@ -513,9 +474,6 @@ def main():
                         help="Voice label for pronunciation guidance")
     parser.add_argument("--pronunciation-map", default=None,
                         help="JSON string for pronunciation overrides (e.g., '{\"word\": \"phonetic\"}')")
-    parser.add_argument("--stream-format", default="audio",
-                        choices=["audio", "sse"],
-                        help="Stream chunk format (default: audio, options: audio or sse)")
     parser.add_argument("--markdown-filter", action="store_true", default=False,
                         help="Filter markdown syntax from input text")
 
