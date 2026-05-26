@@ -411,7 +411,7 @@ def main():
 
     # Generate subcommand
     gen_parser = subparsers.add_parser("generate", help="Generate a new image")
-    gen_parser.add_argument("--prompt", required=True, help="Text prompt (1-2000 characters)")
+    gen_parser.add_argument("--prompt", required=True, help="Text prompt (1-5000 chars for wan2.7 models, 1-2000 chars for qwen models)")
     gen_parser.add_argument("--model", default="wan2.7-image", help="Model name (wan2.7-image-pro, wan2.7-image, qwen-image-2.0-pro, qwen-image-2.0)")
     gen_parser.add_argument("--size", default="2K", help="Output size (2K, 4K for wan models; 2048x2048, 1536x1536, 1024x1024 for qwen models)")
     gen_parser.add_argument("--verbose", action="store_true", help="Print metadata to stderr")
@@ -428,9 +428,10 @@ def main():
     if check_prompt_injection(args.prompt):
         print(f"Warning: Proceeding with potentially adversarial prompt.", file=sys.stderr)
 
-    # Validate prompt length
-    if len(args.prompt) < 1 or len(args.prompt) > 2000:
-        print(f"Error: Prompt must be 1-2000 characters (got {len(args.prompt)})", file=sys.stderr)
+    # Validate prompt length (model-specific)
+    max_len = 5000 if args.model.startswith("wan2.7") else 2000
+    if len(args.prompt) < 1 or len(args.prompt) > max_len:
+        print(f"Error: Prompt must be 1-{max_len} characters for {args.model} (got {len(args.prompt)})", file=sys.stderr)
         sys.exit(EXIT_INPUT_ERROR)
 
     # Validate model

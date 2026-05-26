@@ -30,19 +30,21 @@ python bailian_image.py generate --prompt "A serene mountain landscape at sunset
 
 | Parameter | Default | Range/Choices | Description |
 |---|---|---|---|
-| `--prompt` | (required) | 1–2000 chars | Text description of the image |
+| `--prompt` | (required) | 1–5000 (wan2.7) / 1–2000 (qwen) chars | Text description of the image |
+
+> **Note on prompt limits**: `wan2.7-image` and `wan2.7-image-pro` accept up to 5,000 characters. `qwen-image-2.0` and `qwen-image-2.0-pro` accept up to ~2,000 characters (the API auto-truncates beyond this, but the client validates conservatively).
 | `--model` | `wan2.7-image` | See below | Model name |
 | `--size` | `2K` | See below | Output size/quality preset |
 | `--verbose` | `false` | flag | Print image URL to stderr |
 
 ### Supported Models
 
-| Model | Sizes |
-|---|---|
-| `wan2.7-image-pro` | 4K, 2K |
-| `wan2.7-image` | 2K |
-| `qwen-image-2.0-pro` | 2048x2048, 1536x1536, 1024x1024 |
-| `qwen-image-2.0` | 2048x2048, 1536x1536, 1024x1024 |
+| Model | Sizes | Max Prompt |
+|---|---|---|
+| `wan2.7-image-pro` | 4K, 2K | 5,000 chars |
+| `wan2.7-image` | 2K | 5,000 chars |
+| `qwen-image-2.0-pro` | 2048x2048, 1536x1536, 1024x1024 | ~2,000 chars |
+| `qwen-image-2.0` | 2048x2048, 1536x1536, 1024x1024 | ~2,000 chars |
 
 ### Image Sizes
 
@@ -74,7 +76,7 @@ The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/workspace/output`).
 ## Troubleshooting
 
 - **"API key not set"** — add `BAILIAN_TOKEN_PLAN_API_KEY` to your environment
-- **"Prompt must be 1–2000 characters"** — shorten your prompt
+- **"Prompt too long"** — wan2.7 models: max 5,000 chars; qwen models: max ~2,000 chars
 - **"Invalid model or size"** — check the supported models/sizes table
 
 ## Exit Codes

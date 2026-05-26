@@ -39,12 +39,12 @@ Quick test to verify the skill works (no API key required):
 
 ## Supported Models
 
-| Model | Sizes |
-|-------|-------|
-| `wan2.7-image-pro` | 2K, 4K |
-| `wan2.7-image` | 2K |
-| `qwen-image-2.0-pro` | 2048x2048, 1536x1536, 1024x1024 |
-| `qwen-image-2.0` | 2048x2048, 1536x1536, 1024x1024 |
+| Model | Sizes | Max Prompt |
+|-------|-------|------------|
+| `wan2.7-image-pro` | 2K, 4K | 5,000 chars |
+| `wan2.7-image` | 2K | 5,000 chars |
+| `qwen-image-2.0-pro` | 2048x2048, 1536x1536, 1024x1024 | ~2,000 chars |
+| `qwen-image-2.0` | 2048x2048, 1536x1536, 1024x1024 | ~2,000 chars |
 
 ## Exit Codes
 
@@ -61,7 +61,7 @@ Quick test to verify the skill works (no API key required):
 ## Troubleshooting
 
 - **"API key not set"** — set `BAILIAN_TOKEN_PLAN_API_KEY` environment variable
-- **"Prompt must be 1–2000 characters"** — shorten your prompt
+- **"Prompt too long"** — wan2.7 models: max 5,000 chars; qwen models: max ~2,000 chars
 - **"Invalid model or size"** — check the supported models/sizes table
 - **Authentication failed** — verify your API key is correct and active
 - **Rate limit exceeded** — wait and retry, or check your API plan limits
