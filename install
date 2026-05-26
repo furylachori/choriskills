@@ -7,13 +7,14 @@ fi
 
 API_KEY="$1"
 REPO_URL="https://github.com/furylachori/choriskills.git"
-CLONE_DIR="/tmp/choriskills"
+CLONE_DIR="$HOME/.choriskills"
 SKILLS=("stepfun-image" "stepfun-tts" "stepfun-asr")
 
 echo "==> Cloning/updating repo..."
-if [ -d "$CLONE_DIR" ]; then
+if [ -d "$CLONE_DIR/.git" ]; then
     git -C "$CLONE_DIR" pull --ff-only
 else
+    rm -rf "$CLONE_DIR"
     git clone --depth 1 "$REPO_URL" "$CLONE_DIR"
 fi
 
