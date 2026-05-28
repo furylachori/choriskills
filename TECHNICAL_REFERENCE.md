@@ -1,8 +1,12 @@
-# StepFun API Technical Reference
+# Technical Reference
 
 This document contains the full API details for agent implementation and debugging.
 
+## StepFun API
+
 ## Endpoint Base URLs
+
+### StepFun
 
 | Base URL | Purpose |
 |---|---|
@@ -14,7 +18,25 @@ This document contains the full API details for agent implementation and debuggi
 - The `files` endpoint uses `/v1` (open platform base), not `step_plan/v1`.
 - For open platform access without a Step Plan, set `STEPFUN_API_BASE=https://api.stepfun.ai/v1`.
 
+### Bailian (Alibaba Cloud)
+
+| Base URL | Purpose |
+|---|---|
+| `https://token-plan.ap-southeast-1.maas.aliyuncs.com` | Token Plan billing (default) |
+
+Override with `BAILIAN_TOKEN_PLAN_API_BASE`.
+
+### MiniMax
+
+| Base URL | Purpose |
+|---|---|
+| `https://api.minimax.io/v1` | Default video generation API |
+
+Override with `MINIMAX_API_BASE`.
+
 ## Endpoints
+
+### StepFun
 
 | Feature | Endpoint | Method | Auth |
 |---|---|---|---|
@@ -23,6 +45,20 @@ This document contains the full API details for agent implementation and debuggi
 | Image Edit | `/images/edits` | POST (multipart) | Bearer |
 | Text-to-Speech | `/audio/speech` | POST | Bearer |
 | Speech-to-Text | `/audio/asr/sse` | POST (SSE) | Bearer |
+
+### Bailian (Alibaba Cloud)
+
+| Feature | Endpoint | Method | Auth |
+|---|---|---|---|
+| Image Generate | `/api/v1/services/aigc/multimodal-generation/generation` | POST | Bearer |
+
+### MiniMax
+
+| Feature | Endpoint | Method | Auth |
+|---|---|---|---|
+| Video Generate | `/video_generation` | POST | Bearer |
+| Query Task | `/query/video_generation?task_id=<id>` | GET | Bearer |
+| Get File | `/files/retrieve?file_id=<id>` | GET | Bearer |
 
 ## Image Generation
 
@@ -160,6 +196,106 @@ For container formats (mp3, wav, ogg), only the "type" field is sent.
 
 The `done` event is authoritative — if present and non-empty, it replaces accumulated deltas.
 
+## Bailian Image Generation
+
+**Request:**
+```json
+{
+  "model": "wan2.7-image",
+  "input": {
+    "messages": [{"role": "user", "content": [{"text": "prompt text"}]}]
+  },
+  "parameters": {
+    "size": "2K",
+    "n": 1,
+    "watermark": false
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "output": {
+    "choices": [{
+      "message": {
+        "content": [{"image": "https://..."}]
+      }
+    }]
+  }
+}
+```
+
+**Models:**
+
+| Model | Sizes | Max Prompt |
+|---|---|---|
+| `wan2.7-image-pro` | 4K, 2K | 5,000 chars |
+| `wan2.7-image` | 2K | 5,000 chars |
+| `qwen-image-2.0-pro` | 2048x2048, 1536x1536, 1024x1024 | ~2,000 chars |
+| `qwen-image-2.0` | 2048x2048, 1536x1536, 1024x1024 | ~2,000 chars |
+
+## MiniMax Video Generation
+
+**Request (T2V):**
+```json
+{
+  "model": "MiniMax-Hailuo-2.3",
+  "prompt": "A serene lake at sunset",
+  "duration": 6,
+  "resolution": "768P"
+}
+```
+
+**Request (I2V):**
+```json
+{
+  "model": "MiniMax-Hailuo-2.3",
+  "prompt": "The cat walking",
+  "first_frame_image": "<base64-encoded image>"
+}
+```
+
+**Response (async):**
+```json
+{
+  "task_id": "abc123xyz",
+  "base_resp": {"status_code": 0, "status_msg": ""}
+}
+```
+
+**Poll response (Success):**
+```json
+{
+  "status": "Success",
+  "file_id": "file_abc123",
+  "base_resp": {"status_code": 0, "status_msg": ""}
+}
+```
+
+**Models:**
+
+| Model | Type | Duration |
+|---|---|---|
+| `MiniMax-Hailuo-2.3` | T2V, I2V | 6s, 10s (T2V) / 6s (I2V) |
+| `MiniMax-Hailuo-2.3-Fast` | I2V | 6s only |
+| `MiniMax-Hailuo-02` | T2V, I2V | 6s, 10s (T2V) / 6s (I2V) |
+
+**Resolutions:** `512P`, `768P`, `1080P` (model dependent)
+
+**MiniMax Error Codes (status_code):**
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1002 | Rate limited |
+| 1004 | Authentication failed |
+| 1026 | Prompt flagged (content safety) |
+| 1027 | Content flagged |
+| 2008 | Insufficient balance |
+| 2013 | Invalid parameters |
+| 2049 | Invalid API key |
+
 ## Error Codes
 
 | Code | Meaning | Action |
@@ -207,21 +343,40 @@ All scripts in this repo follow these rules:
 
 ## Environment Variables
 
+### StepFun
+
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `STEPFUN_API_KEY` | Yes | — | StepFun API key |
 | `OUTPUT_DIR` | No | `~/.zeroclaw/workspace/output` | Output directory |
 | `STEPFUN_API_BASE` | No | `https://api.stepfun.ai/step_plan/v1` | Override API base URL |
 
+### Bailian (Alibaba Cloud)
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `BAILIAN_TOKEN_PLAN_API_KEY` | Yes | — | Bailian API key |
+| `BAILIAN_TOKEN_PLAN_API_BASE` | No | `https://token-plan.ap-southeast-1.maas.aliyuncs.com` | Override API base URL |
+| `OUTPUT_DIR` | No | `~/.zeroclaw/workspace/output` | Output directory |
+
+### MiniMax
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `MINIMAX_API_KEY` | Yes | — | MiniMax API key (video generation) |
+| `MINIMAX_API_BASE` | No | `https://api.minimax.io/v1` | Override API base URL |
+| `OUTPUT_DIR` | No | `~/.zeroclaw/workspace/output` | Output directory |
+
 ## Security
 
 All scripts implement:
-- **SSRF protection** — only allows `https://` to `api.stepfun.ai` for URL downloads
+- **SSRF protection** — only allows `https://` to whitelisted hosts for URL downloads
 - **Path traversal prevention** — blocks `..`, absolute paths outside allowed dirs
 - **Voice/filename sanitization** — strips path separators and special chars
 - **Atomic file writes** — writes to `.tmp` then `os.replace()` to prevent partial files
-- **Response size limits** — 50 MB cap on all downloads and API responses
-- **HTTP timeouts** — 60 second timeout on all network calls
+- **Response size limits** — 50 MB (StepFun/Bailian), 500 MB (MiniMax) cap on all downloads
+- **HTTP timeouts** — 60s (StepFun/MiniMax), 120s (Bailian) timeout on all network calls
+- **Prompt injection detection** — warns on common injection patterns
 
 ## Testing
 
@@ -233,4 +388,6 @@ pytest tests/ -v
 pytest tests/test_stepfun_image.py -v
 pytest tests/test_stepfun_tts.py -v
 pytest tests/test_stepfun_asr.py -v
+pytest tests/test_bailian_image.py -v
+pytest tests/test_minimax_video.py -v
 ```

@@ -6,6 +6,7 @@ Run with: python -m pytest tests/test_stepfun_tts.py -v
 Or: python tests/test_stepfun_tts.py
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -68,45 +69,75 @@ class TestTextValidation(unittest.TestCase):
         with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
             with patch("stepfun_tts.get_output_path", return_value="/tmp/test.mp3"):
                 with patch("urllib.request.urlopen") as mock_urlopen:
-                    mock_response = MagicMock()
-                    mock_response.headers.get.return_value = "audio/mpeg"
-                    mock_response.read.side_effect = [b"fake audio data"] + [b""] * 4
-                    mock_response.__enter__ = MagicMock(return_value=mock_response)
-                    mock_response.__exit__ = MagicMock(return_value=False)
-                    mock_urlopen.return_value = mock_response
-                    
-                    args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
-                    text_to_speech(args)
+                    # Mock API response (JSON with URL)
+                    api_response = MagicMock()
+                    api_response.headers.get.return_value = "application/json"
+                    api_response.read.return_value = json.dumps(
+                        {"url": "https://cdn.aliyuncs.com/audio.mp3"}
+                    ).encode()
+                    api_response.__enter__ = MagicMock(return_value=api_response)
+                    api_response.__exit__ = MagicMock(return_value=False)
+                    mock_urlopen.return_value = api_response
+
+                    # Mock download_url to write fake audio
+                    with patch("stepfun_tts.download_url") as mock_download:
+                        def fake_download(url, output_path):
+                            with open(output_path, 'wb') as f:
+                                f.write(b"fake audio data")
+                        mock_download.side_effect = fake_download
+
+                        args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
+                        text_to_speech(args)
 
     def test_text_boundary_1000(self):
         """Text exactly 1000 chars should pass."""
         with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
             with patch("stepfun_tts.get_output_path", return_value="/tmp/test.mp3"):
                 with patch("urllib.request.urlopen") as mock_urlopen:
-                    mock_response = MagicMock()
-                    mock_response.headers.get.return_value = "audio/mpeg"
-                    mock_response.read.side_effect = [b"fake audio data"] + [b""] * 4
-                    mock_response.__enter__ = MagicMock(return_value=mock_response)
-                    mock_response.__exit__ = MagicMock(return_value=False)
-                    mock_urlopen.return_value = mock_response
-                    
-                    args = MagicMock(text="a" * 1000, voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
-                    text_to_speech(args)
+                    # Mock API response (JSON with URL)
+                    api_response = MagicMock()
+                    api_response.headers.get.return_value = "application/json"
+                    api_response.read.return_value = json.dumps(
+                        {"url": "https://cdn.aliyuncs.com/audio.mp3"}
+                    ).encode()
+                    api_response.__enter__ = MagicMock(return_value=api_response)
+                    api_response.__exit__ = MagicMock(return_value=False)
+                    mock_urlopen.return_value = api_response
+
+                    # Mock download_url to write fake audio
+                    with patch("stepfun_tts.download_url") as mock_download:
+                        def fake_download(url, output_path):
+                            with open(output_path, 'wb') as f:
+                                f.write(b"fake audio data")
+                        mock_download.side_effect = fake_download
+
+                        args = MagicMock(text="a" * 1000, voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
+                        text_to_speech(args)
 
     def test_text_boundary_1(self):
         """Text exactly 1 char should pass."""
         with patch.dict(os.environ, {"STEPFUN_API_KEY": "test"}):
             with patch("stepfun_tts.get_output_path", return_value="/tmp/test.mp3"):
                 with patch("urllib.request.urlopen") as mock_urlopen:
-                    mock_response = MagicMock()
-                    mock_response.headers.get.return_value = "audio/mpeg"
-                    mock_response.read.side_effect = [b"fake audio data"] + [b""] * 4
-                    mock_response.__enter__ = MagicMock(return_value=mock_response)
-                    mock_response.__exit__ = MagicMock(return_value=False)
-                    mock_urlopen.return_value = mock_response
-                    
-                    args = MagicMock(text="a", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
-                    text_to_speech(args)
+                    # Mock API response (JSON with URL)
+                    api_response = MagicMock()
+                    api_response.headers.get.return_value = "application/json"
+                    api_response.read.return_value = json.dumps(
+                        {"url": "https://cdn.aliyuncs.com/audio.mp3"}
+                    ).encode()
+                    api_response.__enter__ = MagicMock(return_value=api_response)
+                    api_response.__exit__ = MagicMock(return_value=False)
+                    mock_urlopen.return_value = api_response
+
+                    # Mock download_url to write fake audio
+                    with patch("stepfun_tts.download_url") as mock_download:
+                        def fake_download(url, output_path):
+                            with open(output_path, 'wb') as f:
+                                f.write(b"fake audio data")
+                        mock_download.side_effect = fake_download
+
+                        args = MagicMock(text="a", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
+                        text_to_speech(args)
 
 
 class TestVoiceSanitization(unittest.TestCase):
@@ -135,48 +166,70 @@ class TestApiKeyValidation(unittest.TestCase):
 class TestTTSIntegration(unittest.TestCase):
     def test_tts_success_audio(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            mock_response = MagicMock()
-            mock_response.headers.get.return_value = "audio/mpeg"
-            mock_response.read.side_effect = [b"fake audio data"] + [b""] * 4
-            mock_response.__enter__ = MagicMock(return_value=mock_response)
-            mock_response.__exit__ = MagicMock(return_value=False)
-            
             with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
-                with patch("urllib.request.urlopen", return_value=mock_response):
-                    args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
-                    output_path = text_to_speech(args)
-                    
-                    self.assertTrue(os.path.exists(output_path))
-                    self.assertIn("tts_lively_girl_", output_path)
-                    self.assertTrue(output_path.endswith(".mp3"))
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    # Mock API response (JSON with URL)
+                    api_response = MagicMock()
+                    api_response.headers.get.return_value = "application/json"
+                    api_response.read.return_value = json.dumps(
+                        {"url": "https://cdn.aliyuncs.com/audio.mp3"}
+                    ).encode()
+                    api_response.__enter__ = MagicMock(return_value=api_response)
+                    api_response.__exit__ = MagicMock(return_value=False)
+                    mock_urlopen.return_value = api_response
+
+                    # Mock download_url to write fake audio
+                    with patch("stepfun_tts.download_url") as mock_download:
+                        def fake_download(url, output_path):
+                            with open(output_path, 'wb') as f:
+                                f.write(b"fake audio data")
+                        mock_download.side_effect = fake_download
+
+                        args = MagicMock(text="Hello world", voice="lively-girl", format="mp3", instruction=None, speed=1.0, volume=1.0, sample_rate=24000, return_url=False, voice_label=None, pronunciation_map=None, stream_format="pcm", markdown_filter=False)
+                        output_path = text_to_speech(args)
+
+                        self.assertTrue(os.path.exists(output_path))
+                        self.assertIn("tts_lively_girl_", output_path)
+                        self.assertTrue(output_path.endswith(".mp3"))
 
     def test_tts_with_instruction(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            mock_response = MagicMock()
-            mock_response.headers.get.return_value = "audio/mpeg"
-            mock_response.read.side_effect = [b"fake audio data"] + [b""] * 4
-            mock_response.__enter__ = MagicMock(return_value=mock_response)
-            mock_response.__exit__ = MagicMock(return_value=False)
-            
             with patch.dict(os.environ, {"STEPFUN_API_KEY": "test", "OUTPUT_DIR": tmpdir}):
-                with patch("urllib.request.urlopen", return_value=mock_response):
-                    args = MagicMock(
-                        text="Hello world",
-                        voice="lively-girl",
-                        format="mp3",
-                        instruction="happy, upbeat",
-                        speed=1.0,
-                        volume=1.0,
-                        sample_rate=24000,
-                        return_url=False,
-                        voice_label=None,
-                        pronunciation_map=None,
-                        stream_format="pcm",
-                        markdown_filter=False
-                    )
-                    output_path = text_to_speech(args)
-                    
-                    self.assertTrue(os.path.exists(output_path))
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    # Mock API response (JSON with URL)
+                    api_response = MagicMock()
+                    api_response.headers.get.return_value = "application/json"
+                    api_response.read.return_value = json.dumps(
+                        {"url": "https://cdn.aliyuncs.com/audio.mp3"}
+                    ).encode()
+                    api_response.__enter__ = MagicMock(return_value=api_response)
+                    api_response.__exit__ = MagicMock(return_value=False)
+                    mock_urlopen.return_value = api_response
+
+                    # Mock download_url to write fake audio
+                    with patch("stepfun_tts.download_url") as mock_download:
+                        def fake_download(url, output_path):
+                            with open(output_path, 'wb') as f:
+                                f.write(b"fake audio data")
+                        mock_download.side_effect = fake_download
+
+                        args = MagicMock(
+                            text="Hello world",
+                            voice="lively-girl",
+                            format="mp3",
+                            instruction="happy, upbeat",
+                            speed=1.0,
+                            volume=1.0,
+                            sample_rate=24000,
+                            return_url=False,
+                            voice_label=None,
+                            pronunciation_map=None,
+                            stream_format="pcm",
+                            markdown_filter=False
+                        )
+                        output_path = text_to_speech(args)
+
+                        self.assertTrue(os.path.exists(output_path))
 
 
 class TestRealFileIO(unittest.TestCase):

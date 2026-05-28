@@ -10,8 +10,8 @@ echo "  Testing all claw-skills"
 echo "=========================================="
 echo ""
 
-PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" python3 -m pytest \
-  tests/ -v -k "not Integration"
+PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image:bailian-image:minimax-video" python3 -m pytest \
+  tests/ -v -m "not integration"
 
 echo ""
 echo "=========================================="

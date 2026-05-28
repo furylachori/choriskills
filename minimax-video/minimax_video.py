@@ -21,6 +21,7 @@ Environment:
 
 import argparse
 import base64
+import ipaddress
 import json
 import os
 import re
@@ -32,6 +33,9 @@ import urllib.request
 import urllib.error
 import urllib.parse
 from datetime import datetime
+
+
+ALLOWED_ENV_KEYS = {"MINIMAX_API_KEY", "MINIMAX_API_BASE", "OUTPUT_DIR"}
 
 
 def _load_env_file():
@@ -50,6 +54,8 @@ def _load_env_file():
             key, _, value = line.partition('=')
             key = key.strip()
             value = value.strip()
+            if key not in ALLOWED_ENV_KEYS:
+                continue
             if key and value and key not in os.environ:
                 os.environ[key] = value
 
@@ -61,10 +67,18 @@ ALLOWED_SCHEMES = {"https"}
 ALLOWED_HOSTS = {"api.minimax.io"}
 ALLOWED_HOST_SUFFIXES = {"cdn.minimax.io"}
 ALLOWED_RESOLUTIONS = {"512P", "768P", "1080P"}
+ALLOWED_MODELS = {"MiniMax-Hailuo-2.3", "MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-02"}
 MAX_RESPONSE_SIZE = 500 * 1024 * 1024  # 500 MB
+MAX_INPUT_IMAGE_SIZE = 50 * 1024 * 1024  # 50 MB
 HTTP_TIMEOUT = 60
 POLL_INTERVAL = 5  # seconds
 POLL_MAX_ATTEMPTS = 120  # 10 minutes max
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(newurl, code, msg, headers, fp)
+
 
 API_URL = os.environ.get("MINIMAX_API_BASE", "https://api.minimax.io/v1")
 API_KEY = os.environ.get("MINIMAX_API_KEY", "")
@@ -186,32 +200,29 @@ def validate_url_safe(url):
         addr_info = socket.getaddrinfo(hostname, None)
         for family, _, _, _, sockaddr in addr_info:
             ip = sockaddr[0]
-            # Block private, loopback, and link-local
-            if ip.startswith(('10.', '172.16.', '172.17.', '172.18.', '172.19.',
-                              '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
-                              '172.25.', '172.26.', '172.27.', '172.28.', '172.29.',
-                              '172.30.', '172.31.', '192.168.', '127.', '0.')):
-                print(f"Error: URL resolves to private IP '{ip}'.", file=sys.stderr)
-                sys.exit(EXIT_INPUT_ERROR)
-            # Block cloud metadata endpoints
-            if ip.startswith('169.254.'):
-                print(f"Error: URL resolves to link-local IP '{ip}'.", file=sys.stderr)
+            try:
+                addr = ipaddress.ip_address(ip)
+                if addr.is_private or addr.is_loopback or addr.is_link_local:
+                    print(f"Error: URL resolves to private/loopback/link-local IP '{ip}'.", file=sys.stderr)
+                    sys.exit(EXIT_INPUT_ERROR)
+            except ValueError:
+                print(f"Error: Invalid IP address '{ip}'.", file=sys.stderr)
                 sys.exit(EXIT_INPUT_ERROR)
     except socket.gaierror:
         pass  # Let the connection fail naturally — can't SSRF if we can't resolve
 
 
-def _urlopen_with_retry(req, timeout, max_retries=2):
+def _urlopen_with_retry(req, timeout, max_retries=2, opener=None):
     """Open URL with retry logic for transient failures."""
     for attempt in range(max_retries + 1):
         try:
-            return urllib.request.urlopen(req, timeout=timeout)
+            return opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, timeout=timeout)
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
                 delay = 2 ** attempt
                 ra = e.headers.get('Retry-After', str(delay))
                 try:
-                    delay = float(ra)
+                    delay = min(float(ra), MAX_RETRY_AFTER)
                 except ValueError:
                     pass
                 print(f"Retrying after {delay:.1f}s (attempt {attempt+1}/{max_retries}, HTTP {e.code})", file=sys.stderr)
@@ -242,16 +253,17 @@ def download_url(url, output_path):
     validate_url_safe(url)
 
     try:
+        opener = urllib.request.build_opener(_NoRedirectHandler)
         req = urllib.request.Request(url, headers={"User-Agent": "claw-skills/1.0"})
         try:
-            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT)
+            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT, opener=opener)
         except urllib.error.HTTPError as e:
             if e.code in (301, 302, 303, 307, 308):
                 redirect_url = e.headers.get('Location')
                 if redirect_url:
                     validate_url_safe(redirect_url)
                     req2 = urllib.request.Request(redirect_url, headers={"User-Agent": "claw-skills/1.0"})
-                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT)
+                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT, opener=opener)
                 else:
                     raise
             else:
@@ -508,10 +520,24 @@ def generate_video(args):
 
     if args.input_image:
         validate_input_path(args.input_image)
+        real_path = os.path.realpath(args.input_image)
+        forbidden_prefixes = ('/etc', '/sys', '/proc', '/dev', '/boot')
+        if real_path.startswith(forbidden_prefixes):
+            print(f"Error: Input image path points to a system directory.", file=sys.stderr)
+            sys.exit(EXIT_INPUT_ERROR)
         if not os.path.exists(args.input_image):
             print(f"Error: Input image file '{args.input_image}' does not exist.", file=sys.stderr)
             sys.exit(EXIT_INPUT_ERROR)
-        with open(args.input_image, 'rb') as f:
+        file_size = os.path.getsize(args.input_image)
+        if file_size > MAX_INPUT_IMAGE_SIZE:
+            print(f"Error: Input image file too large ({file_size} bytes > {MAX_INPUT_IMAGE_SIZE} bytes).", file=sys.stderr)
+            sys.exit(EXIT_INPUT_ERROR)
+        try:
+            fd = os.open(args.input_image, os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError as e:
+            print(f"Error: Cannot open input image (possible symlink): {e}", file=sys.stderr)
+            sys.exit(EXIT_INPUT_ERROR)
+        with os.fdopen(fd, 'rb') as f:
             image_data = f.read()
         b64_image = base64.b64encode(image_data).decode('ascii')
         data["first_frame_image"] = b64_image
@@ -598,6 +624,9 @@ def main():
         sys.exit(EXIT_INPUT_ERROR)
 
     if args.command == "generate":
+        if args.model not in ALLOWED_MODELS:
+            print(f"Error: --model must be one of {ALLOWED_MODELS}, got '{args.model}'", file=sys.stderr)
+            sys.exit(EXIT_INPUT_ERROR)
         if args.duration is not None and args.duration not in (6, 10):
             print(f"Error: --duration must be 6 or 10, got {args.duration}", file=sys.stderr)
             sys.exit(EXIT_INPUT_ERROR)

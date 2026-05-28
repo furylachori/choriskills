@@ -37,10 +37,26 @@ claw-skills/
 │   ├── SKILL.md
 │   ├── stepfun_asr.py
 │   └── TEST
+├── bailian-image/                   # Skill: Generate images (Alibaba Cloud)
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
+│   ├── SKILL.md
+│   ├── bailian_image.py
+│   └── TEST
+├── minimax-video/                   # Skill: Generate videos (MiniMax)
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
+│   ├── SKILL.md
+│   ├── minimax_video.py
+│   └── TEST
 └── tests/                           # Unit + integration tests
     ├── test_stepfun_image.py
     ├── test_stepfun_tts.py
     ├── test_stepfun_asr.py
+    ├── test_bailian_image.py
+    ├── test_minimax_video.py
     └── test_live_integration.py
 ```
 
@@ -52,7 +68,7 @@ cd /tmp/choriskills
 bash install <your-stepfun-api-key>
 ```
 
-This installs `stepfun-image`, `stepfun-tts`, and `stepfun-asr` into zeroclaw with their `.env` files set.
+This installs `stepfun-image`, `stepfun-tts`, `stepfun-asr`, `bailian-image`, and `minimax-video` into zeroclaw with their `.env` files set.
 
 ### Install manually (one by one)
 
@@ -61,6 +77,8 @@ git clone https://github.com/furylachori/choriskills.git /tmp/choriskills
 zeroclaw skills install /tmp/choriskills/stepfun-image
 zeroclaw skills install /tmp/choriskills/stepfun-tts
 zeroclaw skills install /tmp/choriskills/stepfun-asr
+zeroclaw skills install /tmp/choriskills/bailian-image
+zeroclaw skills install /tmp/choriskills/minimax-video
 ```
 
 Then create each `.env`:
@@ -69,13 +87,15 @@ Then create each `.env`:
 echo "STEPFUN_API_KEY=your-key" > ~/.zeroclaw/workspace/skills/stepfun-image/.env
 echo "STEPFUN_API_KEY=your-key" > ~/.zeroclaw/workspace/skills/stepfun-tts/.env
 echo "STEPFUN_API_KEY=your-key" > ~/.zeroclaw/workspace/skills/stepfun-asr/.env
+echo "BAILIAN_TOKEN_PLAN_API_KEY=your-key" > ~/.zeroclaw/workspace/skills/bailian-image/.env
+echo "MINIMAX_API_KEY=your-key" > ~/.zeroclaw/workspace/skills/minimax-video/.env
 ```
 
 ## Running Tests
 
 ```bash
 # All unit tests (no API key required)
-PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image" pytest tests/ -v -k "not integration"
+PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image:bailian-image:minimax-video" pytest tests/ -v -k "not integration"
 
 # Or use the test runner script
 bash TEST_ALL

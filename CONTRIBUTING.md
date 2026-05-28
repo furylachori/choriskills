@@ -27,10 +27,26 @@ claw-skills/
 │   ├── SKILL.md
 │   ├── stepfun_asr.py
 │   └── TEST
+├── bailian-image/                # Image generation (Alibaba Cloud)
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
+│   ├── SKILL.md
+│   ├── bailian_image.py
+│   └── TEST
+├── minimax-video/                # Video generation (MiniMax)
+│   ├── .env.example
+│   ├── main.py
+│   ├── README.md
+│   ├── SKILL.md
+│   ├── minimax_video.py
+│   └── TEST
 ├── tests/                        # Unit tests
 │   ├── test_stepfun_image.py
 │   ├── test_stepfun_tts.py
 │   ├── test_stepfun_asr.py
+│   ├── test_bailian_image.py
+│   ├── test_minimax_video.py
 │   └── test_live_integration.py
 ├── README.md
 ├── TECHNICAL_REFERENCE.md

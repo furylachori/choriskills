@@ -13,9 +13,11 @@ Environment:
 """
 
 import argparse
+import ipaddress
 import json
 import os
 import re
+import socket
 import sys
 import tempfile
 import time
@@ -30,7 +32,7 @@ MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
 HTTP_TIMEOUT = 120
 
 API_BASE = os.environ.get("BAILIAN_TOKEN_PLAN_API_BASE", "https://token-plan.ap-southeast-1.maas.aliyuncs.com")
-API_KEY = os.environ.get("BAILIAN_TOKEN_PLAN_API_KEY", "")
+_ALLOWED_ENV_KEYS = {"BAILIAN_TOKEN_PLAN_API_KEY", "BAILIAN_TOKEN_PLAN_API_BASE", "OUTPUT_DIR"}
 
 # Exit codes for agent programmatic handling
 EXIT_OK = 0
@@ -40,6 +42,11 @@ EXIT_RATE_LIMIT = 4       # 429 rate limited
 EXIT_NETWORK_ERROR = 5    # Connection failures
 EXIT_API_ERROR = 6        # API returned error (400, 500, etc.)
 EXIT_FILE_ERROR = 7       # Disk full, permission denied, I/O failures
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(newurl, code, msg, headers, fp)
 
 
 def _load_env_file():
@@ -58,7 +65,7 @@ def _load_env_file():
             key, _, value = line.partition('=')
             key = key.strip()
             value = value.strip()
-            if key and value and key not in os.environ:
+            if key and value and key not in os.environ and key in _ALLOWED_ENV_KEYS:
                 os.environ[key] = value
 
 _load_env_file()
@@ -134,7 +141,7 @@ def get_output_path(prompt=None, extension="png"):
     if not real_output_path.startswith(real_output_dir + os.sep) and real_output_path != real_output_dir:
         print(f"Error: Computed output path '{output_path}' (resolved to '{real_output_path}') "
               f"escapes the output directory '{real_output_dir}'.", file=sys.stderr)
-        sys.exit(EXIT_INPUT_ERROR)
+        sys.exit(EXIT_FILE_ERROR)
 
     return output_path
 
@@ -187,18 +194,30 @@ def validate_url_safe(url):
         print(f"Error: URL hostname '{hostname}' is not allowed.", file=sys.stderr)
         sys.exit(EXIT_INPUT_ERROR)
 
+    # DNS-level SSRF protection: resolve hostname and block private/linklocal IPs
+    try:
+        addrinfos = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        print(f"Error: Could not resolve hostname '{hostname}'.", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
+    for family, _, _, _, sockaddr in addrinfos:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            print(f"Error: URL hostname '{hostname}' resolves to a private/internal IP address.", file=sys.stderr)
+            sys.exit(EXIT_INPUT_ERROR)
 
-def _urlopen_with_retry(req, timeout, max_retries=2):
+
+def _urlopen_with_retry(req, timeout, max_retries=2, opener=None):
     """Open URL with retry logic for transient failures."""
     for attempt in range(max_retries + 1):
         try:
-            return urllib.request.urlopen(req, timeout=timeout)
+            return opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, timeout=timeout)
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
                 delay = 2 ** attempt
                 ra = e.headers.get('Retry-After', str(delay))
                 try:
-                    delay = float(ra)
+                    delay = min(float(ra), MAX_RETRY_AFTER)
                 except ValueError:
                     pass
                 print(f"Retrying after {delay:.1f}s (attempt {attempt+1}/{max_retries}, HTTP {e.code})", file=sys.stderr)
@@ -229,16 +248,17 @@ def download_url(url, output_path):
     validate_url_safe(url)
 
     try:
+        opener = urllib.request.build_opener(_NoRedirectHandler)
         req = urllib.request.Request(url, headers={"User-Agent": "claw-skills/1.0"})
         try:
-            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT)
+            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT, opener=opener)
         except urllib.error.HTTPError as e:
             if e.code in (301, 302, 303, 307, 308):
                 redirect_url = e.headers.get('Location')
                 if redirect_url:
                     validate_url_safe(redirect_url)
                     req2 = urllib.request.Request(redirect_url, headers={"User-Agent": "claw-skills/1.0"})
-                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT)
+                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT, opener=opener)
                 else:
                     raise
             else:

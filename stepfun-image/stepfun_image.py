@@ -62,6 +62,12 @@ MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
 SIZE_RE = re.compile(r'^\d+x\d+$')
 HTTP_TIMEOUT = 60
 
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(newurl, code, msg, headers, fp)
+
+
 API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v1")
 API_KEY = os.environ.get("STEPFUN_API_KEY", "")
 
@@ -209,11 +215,11 @@ def validate_input_path(input_path):
         sys.exit(EXIT_INPUT_ERROR)
 
 
-def _urlopen_with_retry(req, timeout, max_retries=2):
+def _urlopen_with_retry(req, timeout, max_retries=2, opener=None):
     """Open URL with retry logic for transient failures."""
     for attempt in range(max_retries + 1):
         try:
-            return urllib.request.urlopen(req, timeout=timeout)
+            return opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, timeout=timeout)
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
                 delay = 2 ** attempt
@@ -250,17 +256,18 @@ def download_url(url, output_path):
     validate_url_safe(url)
 
     try:
+        opener = urllib.request.build_opener(_NoRedirectHandler)
         req = urllib.request.Request(url, headers={"User-Agent": "claw-skills/1.0"})
         # Block automatic redirects - validate manually
         try:
-            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT)
+            response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT, opener=opener)
         except urllib.error.HTTPError as e:
             if e.code in (301, 302, 303, 307, 308):
                 redirect_url = e.headers.get('Location')
                 if redirect_url:
                     validate_url_safe(redirect_url)  # Re-validate redirect target
                     req2 = urllib.request.Request(redirect_url, headers={"User-Agent": "claw-skills/1.0"})
-                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT)
+                    response = _urlopen_with_retry(req2, timeout=HTTP_TIMEOUT, opener=opener)
                 else:
                     raise
             else:

@@ -1,0 +1,22 @@
+#!/bin/bash
+# Test script for bailian-image skill
+# Runs unit tests only (no API key required)
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=========================================="
+echo "  Testing bailian-image"
+echo "=========================================="
+echo ""
+
+PYTHONPATH="$SCRIPT_DIR" python3 -m pytest \
+  "$SCRIPT_DIR/../tests/test_bailian_image.py" \
+  -v -k "not Integration"
+
+echo ""
+echo "=========================================="
+echo "  All bailian-image tests passed!"
+echo "=========================================="

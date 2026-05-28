@@ -31,11 +31,11 @@ python bailian_image.py generate --prompt "A serene mountain landscape at sunset
 | Parameter | Default | Range/Choices | Description |
 |---|---|---|---|
 | `--prompt` | (required) | 1–5000 (wan2.7) / 1–2000 (qwen) chars | Text description of the image |
-
-> **Note on prompt limits**: `wan2.7-image` and `wan2.7-image-pro` accept up to 5,000 characters. `qwen-image-2.0` and `qwen-image-2.0-pro` accept up to ~2,000 characters (the API auto-truncates beyond this, but the client validates conservatively).
 | `--model` | `wan2.7-image` | See below | Model name |
 | `--size` | `2K` | See below | Output size/quality preset |
 | `--verbose` | `false` | flag | Print image URL to stderr |
+
+> **Note on prompt limits**: `wan2.7-image` and `wan2.7-image-pro` accept up to 5,000 characters. `qwen-image-2.0` and `qwen-image-2.0-pro` accept up to ~2,000 characters (the API auto-truncates beyond this, but the client validates conservatively).
 
 ### Supported Models
 

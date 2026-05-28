@@ -70,11 +70,16 @@ API_URL = os.environ.get("STEPFUN_API_BASE", "https://api.stepfun.ai/step_plan/v
 API_KEY = os.environ.get("STEPFUN_API_KEY", "")
 
 
-def _urlopen_with_retry(req, timeout, max_retries=2):
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(newurl, code, msg, headers, fp)
+
+
+def _urlopen_with_retry(req, timeout, max_retries=2, opener=None):
     """Open URL with retry logic for transient failures."""
     for attempt in range(max_retries + 1):
         try:
-            return urllib.request.urlopen(req, timeout=timeout)
+            return opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, timeout=timeout)
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
                 delay = 2 ** attempt
