@@ -487,7 +487,7 @@ def poll_task(task_id, args):
             status_msg = result.get("base_resp", {}).get("status_msg", "Unknown error")
             print(f"Video generation failed: {status_msg}", file=sys.stderr)
             sys.exit(EXIT_API_ERROR)
-        elif status in ("Processing", "Queueing"):
+        elif status in ("Processing", "Queueing", "Preparing"):
             time.sleep(POLL_INTERVAL)
         else:
             print(f"Unknown status '{status}', continuing...", file=sys.stderr)
@@ -651,7 +651,7 @@ def retrieve_video(args):
         download_url(download_url_result, output_path)
         print(f"Video downloaded: {output_path}")
         
-    elif status in ("Processing", "Queueing"):
+    elif status in ("Processing", "Queueing", "Preparing"):
         print(f"Status: {status}")
         print(f"Task ID: {args.task_id}")
         print(f"Video is still {status.lower()}. Try again in a few minutes.", file=sys.stderr)
