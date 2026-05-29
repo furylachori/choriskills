@@ -14,6 +14,9 @@ Usage:
     # Sync mode (wait for completion)
     python minimax_video.py generate --prompt "Ocean waves crashing" --sync
 
+    # Retrieve a previously submitted video
+    python minimax_video.py retrieve --task-id <id>
+
 Environment:
     MINIMAX_API_KEY - Required. Your MiniMax API key.
     MINIMAX_API_BASE - Optional. API base URL (default: https://api.minimax.io/v1)
@@ -70,6 +73,7 @@ ALLOWED_RESOLUTIONS = {"512P", "768P", "1080P"}
 ALLOWED_MODELS = {"MiniMax-Hailuo-2.3", "MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-02"}
 MAX_RESPONSE_SIZE = 500 * 1024 * 1024  # 500 MB
 MAX_INPUT_IMAGE_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_RETRY_AFTER = 60
 HTTP_TIMEOUT = 60
 POLL_INTERVAL = 5  # seconds
 POLL_MAX_ATTEMPTS = 120  # 10 minutes max
@@ -601,6 +605,76 @@ def generate_video(args):
     print(f"Video generated: {output_path}")
 
 
+def retrieve_video(args):
+    """Retrieve a video by task_id."""
+    if not args.task_id or not args.task_id.strip():
+        print("Error: --task-id cannot be empty.", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+    if len(args.task_id) > 256:
+        print("Error: --task-id is too long (max 256 characters).", file=sys.stderr)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    result = query_task(args.task_id)
+    
+    base_resp = result.get("base_resp", {})
+    status = result.get("status", "Unknown")
+    
+    if args.verbose:
+        print(f"Task status: {status}", file=sys.stderr)
+        print(f"Task ID: {args.task_id}", file=sys.stderr)
+        if status == "Success":
+            print(f"File ID: {result.get('file_id')}", file=sys.stderr)
+    
+    if status == "Success":
+        file_id = result.get("file_id")
+        if not file_id:
+            print("Error: Task succeeded but no file_id returned", file=sys.stderr)
+            sys.exit(EXIT_API_ERROR)
+        
+        download_url_result = get_file_download_url(file_id)
+        if not download_url_result:
+            print("Error: No download URL in file response", file=sys.stderr)
+            sys.exit(EXIT_API_ERROR)
+        
+        output_path = get_output_path(args.task_id)
+        
+        if not check_disk_space(output_path):
+            print("Error: Insufficient disk space for output file.", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
+        
+        download_url(download_url_result, output_path)
+        print(f"Video downloaded: {output_path}")
+        
+    elif status in ("Processing", "Queueing"):
+        print(f"Status: {status}")
+        print(f"Task ID: {args.task_id}")
+        print(f"Video is still {status.lower()}. Try again in a few minutes.", file=sys.stderr)
+        if args.sync:
+            print("Waiting for completion...", file=sys.stderr)
+            file_id = poll_task(args.task_id, args)
+            download_url_result = get_file_download_url(file_id)
+            if not download_url_result:
+                print("Error: No download URL in file response", file=sys.stderr)
+                sys.exit(EXIT_API_ERROR)
+            output_path = get_output_path(args.task_id)
+            if not check_disk_space(output_path):
+                print("Error: Insufficient disk space for output file.", file=sys.stderr)
+                sys.exit(EXIT_FILE_ERROR)
+            download_url(download_url_result, output_path)
+            print(f"Video downloaded: {output_path}")
+        else:
+            sys.exit(EXIT_OK)
+    
+    elif status in ("Fail", "Failed"):
+        status_msg = base_resp.get("status_msg", "Unknown error")
+        print(f"Video generation failed: {status_msg}", file=sys.stderr)
+        sys.exit(EXIT_API_ERROR)
+    
+    else:
+        print(f"Unknown status: {status}", file=sys.stderr)
+        sys.exit(EXIT_API_ERROR)
+
+
 def main():
     parser = argparse.ArgumentParser(description="MiniMax Video API Client")
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
@@ -616,6 +690,12 @@ def main():
     gen_parser.add_argument("--input-image", default=None, help="Input image file for I2V")
     gen_parser.add_argument("--sync", action="store_true", help="Wait for completion")
     gen_parser.add_argument("--verbose", action="store_true", help="Print metadata to stderr")
+
+    # Retrieve subcommand
+    ret_parser = subparsers.add_parser("retrieve", help="Retrieve a video by task ID")
+    ret_parser.add_argument("--task-id", required=True, help="Task ID from a previous generate command")
+    ret_parser.add_argument("--sync", action="store_true", help="Wait for completion if still processing")
+    ret_parser.add_argument("--verbose", action="store_true", help="Print metadata to stderr")
 
     args = parser.parse_args()
 
@@ -634,6 +714,9 @@ def main():
             print(f"Error: --resolution must be one of {ALLOWED_RESOLUTIONS}, got '{args.resolution}'", file=sys.stderr)
             sys.exit(EXIT_INPUT_ERROR)
         generate_video(args)
+
+    elif args.command == "retrieve":
+        retrieve_video(args)
 
 
 if __name__ == "__main__":

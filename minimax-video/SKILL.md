@@ -33,6 +33,20 @@ Run `generate` with an input image:
 python minimax_video.py generate --prompt "The cat walking gracefully" --input-image cat.png
 ```
 
+### Retrieve a video
+
+When a video is generated in async mode, you get a task ID. Use `retrieve` to download the video once it's ready:
+
+```bash
+python minimax_video.py retrieve --task-id abc123xyz
+```
+
+If the video is still processing, the script will tell you to try again later. Use `--sync` to wait:
+
+```bash
+python minimax_video.py retrieve --task-id abc123xyz --sync
+```
+
 ### Sync mode (wait for completion)
 
 By default, the script returns immediately with a task_id. Use `--sync` to wait for completion and download:
@@ -51,6 +65,15 @@ python minimax_video.py generate --prompt "Ocean waves crashing" --sync
 | `--resolution` | `768P` | 512P, 768P, 1080P | Output resolution (model dependent) |
 | `--input-image` | None | file path | Starting image for I2V |
 | `--sync` | false | flag | Wait for completion and download |
+| `--verbose` | false | flag | Print detailed metadata to stderr |
+| `--task-id` | (required for retrieve) | string | Task ID from a previous generate command |
+
+### Retrieve Parameters
+
+| Parameter | Default | Range/Choices | Description |
+|---|---|---|---|
+| `--task-id` | (required) | string | Task ID from a previous generate command |
+| `--sync` | false | flag | Wait for completion if still processing |
 | `--verbose` | false | flag | Print detailed metadata to stderr |
 
 ### Supported Models
@@ -107,6 +130,10 @@ For async mode (default), it prints:
 Task submitted: abc123xyz
 Status: https://api.minimax.io/v1/query/video_generation?task_id=abc123xyz
 ```
+
+For retrieve mode:
+- If video is ready: `Video downloaded: /path/to/output/video_xxx.mp4`
+- If still processing: `Video is still processing. Try again in a few minutes.` (exits 0)
 
 The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/workspace/output`).
 
