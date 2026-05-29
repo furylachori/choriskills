@@ -7,6 +7,20 @@ description: Generate videos from text prompts or images using the MiniMax API. 
 
 Generate videos from text prompts or images using the MiniMax API.
 
+## CRITICAL RULES
+
+> **Read these before generating any video.**
+
+1. **NEVER reuse images from previous requests.** If the user sends a new image, use THAT image. Do not use an image from a previous conversation or request.
+
+2. **ALWAYS confirm the image path before generating I2V.** Tell the user: "I will generate a video using [image path] — is this correct?" Wait for confirmation before proceeding.
+
+3. **Report the task ID immediately.** Do not wait for the video to complete. Tell the user: "Your video is being generated. Task ID: [id]. Ask me for it in ~5 minutes."
+
+4. **Do NOT use `send_message`.** Just report the task ID directly in your response.
+
+5. **Use `retrieve` to fetch completed videos.** When the user asks for their video, run `retrieve --task-id <id>`.
+
 ## When to Use
 
 Use this skill when the user requests to:
@@ -50,6 +64,23 @@ If the video is still processing, the script will tell you to try again later. U
 ```bash
 python minimax_video.py retrieve --task-id abc123xyz --sync
 ```
+
+### Recommended I2V Workflow
+
+**ALWAYS follow this flow to avoid wasting credits:**
+
+1. User sends an image and asks to animate it
+2. **Confirm the image:** "I will generate a video using [image path]. Is this correct?"
+3. Wait for user confirmation
+4. Run the generate command
+5. Report the task ID: "Your video is being generated. Task ID: [id]. Ask me for it in ~5 minutes."
+6. When user asks for video → use `retrieve --task-id <id>`
+
+**NEVER:**
+- Reuse an image from a previous request
+- Assume which image the user wants
+- Wait for the video to complete (use async by default)
+- Use `send_message` to report results
 
 ### Sync mode (wait for completion)
 
