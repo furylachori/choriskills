@@ -543,8 +543,14 @@ def generate_video(args):
             sys.exit(EXIT_INPUT_ERROR)
         with os.fdopen(fd, 'rb') as f:
             image_data = f.read()
+        
+        # Detect MIME type from file extension
+        ext = os.path.splitext(args.input_image)[1].lower()
+        mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp'}
+        mime_type = mime_map.get(ext, 'image/png')
+        
         b64_image = base64.b64encode(image_data).decode('ascii')
-        data["first_frame_image"] = b64_image
+        data["first_frame_image"] = f"data:{mime_type};base64,{b64_image}"
 
     response = call_api("video_generation", data=data)
 
