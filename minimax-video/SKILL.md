@@ -25,13 +25,17 @@ Run `generate` with a text prompt:
 python minimax_video.py generate --prompt "A serene lake at sunset with birds flying"
 ```
 
-### Image-to-Video
+### Image-to-Video (I2V)
 
-Run `generate` with an input image:
+Animate a **local image file** into a video. Use `--input-image` with a file path (not a URL):
 
 ```bash
-python minimax_video.py generate --prompt "The cat walking gracefully" --input-image cat.png
+python minimax_video.py generate --prompt "The cat walking gracefully" --input-image /path/to/cat.png
 ```
+
+> **Important:** `--input-image` accepts a **local file path**. The script reads the file, encodes it, and sends it to the API. You do NOT need to upload the image to a URL first.
+
+The image becomes the first frame of the generated video.
 
 ### Retrieve a video
 
@@ -63,7 +67,7 @@ python minimax_video.py generate --prompt "Ocean waves crashing" --sync
 | `--model` | `MiniMax-Hailuo-2.3` | See below | Model name |
 | `--duration` | `6` | 6, 10 | Video length in seconds |
 | `--resolution` | `768P` | 512P, 768P, 1080P | Output resolution (model dependent) |
-| `--input-image` | None | file path | Starting image for I2V |
+| `--input-image` | None | local file path | Local image file to use as first frame (I2V). NOT a URL. |
 | `--sync` | false | flag | Wait for completion and download |
 | `--verbose` | false | flag | Print detailed metadata to stderr |
 | `--task-id` | (required for retrieve) | string | Task ID from a previous generate command |
