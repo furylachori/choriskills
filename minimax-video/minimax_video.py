@@ -90,11 +90,11 @@ API_KEY = os.environ.get("MINIMAX_API_KEY", "")
 # Exit codes for agent programmatic handling
 EXIT_OK = 0
 EXIT_INPUT_ERROR = 2      # Bad arguments, file not found, validation failures
-EXIT_AUTH_ERROR = 3      # Missing/invalid API key
-EXIT_RATE_LIMIT = 4     # Rate limited
-EXIT_NETWORK_ERROR = 5  # Connection failures
-EXIT_API_ERROR = 6       # API returned error
-EXIT_FILE_ERROR = 7      # Disk full, permission denied, I/O failures
+EXIT_AUTH_ERROR = 3       # Missing/invalid API key
+EXIT_RATE_LIMIT = 4       # Rate limited
+EXIT_NETWORK_ERROR = 5    # Connection failures
+EXIT_API_ERROR = 6        # API returned error
+EXIT_FILE_ERROR = 7       # Disk full, permission denied, I/O failures
 
 
 def validate_api_base():
@@ -206,14 +206,15 @@ def validate_url_safe(url):
             ip = sockaddr[0]
             try:
                 addr = ipaddress.ip_address(ip)
-                if addr.is_private or addr.is_loopback or addr.is_link_local:
+                if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
                     print(f"Error: URL resolves to private/loopback/link-local IP '{ip}'.", file=sys.stderr)
                     sys.exit(EXIT_INPUT_ERROR)
             except ValueError:
                 print(f"Error: Invalid IP address '{ip}'.", file=sys.stderr)
                 sys.exit(EXIT_INPUT_ERROR)
     except socket.gaierror:
-        pass  # Let the connection fail naturally — can't SSRF if we can't resolve
+        print(f"Error: Could not resolve hostname '{hostname}'.", file=sys.stderr)
+        sys.exit(EXIT_NETWORK_ERROR)
 
 
 def _urlopen_with_retry(req, timeout, max_retries=2, opener=None):
@@ -283,6 +284,10 @@ def download_url(url, output_path):
             if content_length_int > MAX_RESPONSE_SIZE:
                 print(f"Error: Response too large ({content_length_int} bytes > {MAX_RESPONSE_SIZE})", file=sys.stderr)
                 sys.exit(EXIT_FILE_ERROR)
+
+        if not check_disk_space(output_path, MAX_RESPONSE_SIZE):
+            print(f"Error: Insufficient disk space to download file", file=sys.stderr)
+            sys.exit(EXIT_FILE_ERROR)
 
         tmp_path = output_path + ".tmp"
         total = 0
@@ -467,7 +472,11 @@ def poll_task(task_id, args):
 
         base_resp = result.get("base_resp", {})
         if base_resp.get("status_code") == 1002:
-            wait_time = 30
+            retry_after = base_resp.get("retry_after")
+            if retry_after is not None:
+                wait_time = min(retry_after, MAX_RETRY_AFTER)
+            else:
+                wait_time = 30
             print(f"Rate limited (1002), waiting {wait_time}s before retry", file=sys.stderr)
             time.sleep(wait_time)
             continue
@@ -546,8 +555,11 @@ def generate_video(args):
         
         # Detect MIME type from file extension
         ext = os.path.splitext(args.input_image)[1].lower()
-        mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp'}
-        mime_type = mime_map.get(ext, 'image/png')
+        mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.tiff': 'image/tiff'}
+        mime_type = mime_map.get(ext)
+        if not mime_type:
+            print(f"Error: Unsupported image format '{ext}'. Supported: {', '.join(mime_map.keys())}", file=sys.stderr)
+            sys.exit(EXIT_INPUT_ERROR)
         
         b64_image = base64.b64encode(image_data).decode('ascii')
         data["first_frame_image"] = f"data:{mime_type};base64,{b64_image}"
@@ -654,7 +666,7 @@ def retrieve_video(args):
     elif status in ("Processing", "Queueing", "Preparing"):
         print(f"Status: {status}")
         print(f"Task ID: {args.task_id}")
-        print(f"Video is still {status.lower()}. Try again in a few minutes.", file=sys.stderr)
+        print(f"Video is still {status.lower()}. Try again in a few minutes.")
         if args.sync:
             print("Waiting for completion...", file=sys.stderr)
             file_id = poll_task(args.task_id, args)

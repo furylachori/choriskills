@@ -18,7 +18,7 @@ Use this skill when the user requests to:
 ## How to Use
 
 ```bash
-python stepfun_asr.py --audio recording.mp3 --language en
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-asr/stepfun_asr.py --audio recording.mp3 --language en
 ```
 
 ### Language support

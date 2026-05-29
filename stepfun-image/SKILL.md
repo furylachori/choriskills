@@ -23,7 +23,7 @@ Use this skill when the user requests to:
 Run `generate` with a text prompt. Output is saved automatically.
 
 ```bash
-python stepfun_image.py generate --prompt "A serene alpine lake at sunset, mirror reflection, photorealistic, 8K"
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-image/stepfun_image.py generate --prompt "A serene alpine lake at sunset, mirror reflection, photorealistic, 8K"
 ```
 
 ### Edit an existing image
@@ -31,7 +31,7 @@ python stepfun_image.py generate --prompt "A serene alpine lake at sunset, mirro
 Run `edit` with a prompt and an input file.
 
 ```bash
-python stepfun_image.py edit --prompt "Make the dog look older and chubbier" --input input.png
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-image/stepfun_image.py edit --prompt "Make the dog look older and chubbier" --input input.png
 ```
 
 ## Optional Parameters

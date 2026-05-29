@@ -9,10 +9,10 @@ Convert text to speech using StepFun's TTS API.
 export STEPFUN_API_KEY="your-key-here"
 
 # Synthesize speech
-python stepfun_tts.py synthesize --text "Hello, world!"
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-tts/stepfun_tts.py synthesize --text "Hello, world!"
 
 # Or use the standardized entry point
-python main.py synthesize --text "Hello, world!"
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-tts/main.py synthesize --text "Hello, world!"
 ```
 
 ## Validation

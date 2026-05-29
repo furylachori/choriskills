@@ -36,7 +36,7 @@ Use this skill when the user requests to:
 Run `generate` with a text prompt:
 
 ```bash
-python minimax_video.py generate --prompt "A serene lake at sunset with birds flying"
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py generate --prompt "A serene lake at sunset with birds flying"
 ```
 
 ### Image-to-Video (I2V)
@@ -44,7 +44,7 @@ python minimax_video.py generate --prompt "A serene lake at sunset with birds fl
 Animate a **local image file** into a video. Use `--input-image` with a file path (not a URL):
 
 ```bash
-python minimax_video.py generate --prompt "The cat walking gracefully" --input-image /path/to/cat.png
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py generate --prompt "The cat walking gracefully" --input-image /path/to/cat.png
 ```
 
 > **Important:** `--input-image` accepts a **local file path**. The script reads the file, encodes it, and sends it to the API. You do NOT need to upload the image to a URL first.
@@ -56,13 +56,13 @@ The image becomes the first frame of the generated video.
 When a video is generated in async mode, you get a task ID. Use `retrieve` to download the video once it's ready:
 
 ```bash
-python minimax_video.py retrieve --task-id abc123xyz
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py retrieve --task-id abc123xyz
 ```
 
 If the video is still processing, the script will tell you to try again later. Use `--sync` to wait:
 
 ```bash
-python minimax_video.py retrieve --task-id abc123xyz --sync
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py retrieve --task-id abc123xyz --sync
 ```
 
 ### Recommended I2V Workflow
@@ -84,14 +84,14 @@ python minimax_video.py retrieve --task-id abc123xyz --sync
 - Assume which image the user wants without asking
 - Carry over an image from a previous request without confirmation
 - Wait for the video to complete (use async by default)
-- Use `send_message` to report results
+- Report the task ID directly in your response
 
 ### Sync mode (wait for completion)
 
 By default, the script returns immediately with a task_id. Use `--sync` to wait for completion and download:
 
 ```bash
-python minimax_video.py generate --prompt "Ocean waves crashing" --sync
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py generate --prompt "Ocean waves crashing" --sync
 ```
 
 ## Parameters
@@ -103,6 +103,8 @@ python minimax_video.py generate --prompt "Ocean waves crashing" --sync
 | `--duration` | `6` | 6, 10 | Video length in seconds |
 | `--resolution` | `768P` | 512P, 768P, 1080P | Output resolution (model dependent) |
 | `--input-image` | None | local file path | Local image file to use as first frame (I2V). NOT a URL. |
+| `--prompt-optimizer` | false | flag | Enable prompt optimizer |
+| `--fast-pretreatment` | false | flag | Enable fast pretreatment |
 | `--sync` | false | flag | Wait for completion and download |
 | `--verbose` | false | flag | Print detailed metadata to stderr |
 | `--task-id` | (required for retrieve) | string | Task ID from a previous generate command |

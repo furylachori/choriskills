@@ -18,7 +18,7 @@ Use this skill when the user requests to:
 ## How to Use
 
 ```bash
-python stepfun_tts.py --text "Hello, this is a test" --voice lively-girl
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-tts/stepfun_tts.py --text "Hello, this is a test" --voice lively-girl
 ```
 
 ### Choosing a voice
@@ -37,7 +37,7 @@ Full list in `STEPFUN_VOICES` constant.
 Use `--instruction` to guide the delivery style:
 
 ```bash
-python stepfun_tts.py --text "Welcome to Desampa" --voice elegantgentle-female --instruction "warm and welcoming"
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-tts/stepfun_tts.py --text "Welcome to Desampa" --voice elegantgentle-female --instruction "warm and welcoming"
 ```
 
 ## All Parameters

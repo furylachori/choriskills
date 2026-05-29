@@ -9,10 +9,10 @@ Generate images from text prompts using the Bailian (Alibaba Cloud) Image API.
 export BAILIAN_TOKEN_PLAN_API_KEY="your-key-here"
 
 # Generate an image
-python bailian_image.py generate --prompt "A serene mountain landscape at sunset"
+python3 $HOME/.zeroclaw/workspace/skills/bailian-image/bailian_image.py generate --prompt "A serene mountain landscape at sunset"
 
 # Or use the standardized entry point
-python main.py generate --prompt "A serene mountain landscape at sunset"
+python3 $HOME/.zeroclaw/workspace/skills/bailian-image/main.py generate --prompt "A serene mountain landscape at sunset"
 ```
 
 ## Files

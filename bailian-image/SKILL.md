@@ -20,7 +20,7 @@ Use this skill when the user requests to:
 Run `generate` with a text prompt:
 
 ```bash
-python bailian_image.py generate --prompt "A serene mountain landscape at sunset, photorealistic"
+python3 $HOME/.zeroclaw/workspace/skills/bailian-image/bailian_image.py generate --prompt "A serene mountain landscape at sunset, photorealistic"
 ```
 
 **Default model**: `wan2.7-image`  

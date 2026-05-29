@@ -19,7 +19,6 @@ import os
 import re
 import socket
 import sys
-import tempfile
 import time
 import urllib.request
 import urllib.error
@@ -29,6 +28,7 @@ ALLOWED_SCHEMES = {"https"}
 ALLOWED_HOSTS = {"token-plan.ap-southeast-1.maas.aliyuncs.com"}
 ALLOWED_HOST_SUFFIXES = {".aliyuncs.com"}
 MAX_RESPONSE_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_RETRY_AFTER = 60
 HTTP_TIMEOUT = 120
 
 API_BASE = os.environ.get("BAILIAN_TOKEN_PLAN_API_BASE", "https://token-plan.ap-southeast-1.maas.aliyuncs.com")
@@ -351,12 +351,14 @@ def call_api(endpoint, data=None):
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
 
     try:
-        with _urlopen_with_retry(req, timeout=HTTP_TIMEOUT) as response:
-            try:
-                return json.loads(response.read().decode())
-            except json.JSONDecodeError:
-                print(f"Error: Invalid JSON response from API", file=sys.stderr)
-                sys.exit(EXIT_API_ERROR)
+        response = _urlopen_with_retry(req, timeout=HTTP_TIMEOUT)
+        try:
+            return json.loads(response.read().decode())
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON response from API", file=sys.stderr)
+            sys.exit(EXIT_API_ERROR)
+        finally:
+            response.close()
     except urllib.error.HTTPError as e:
         if e.code == 401 or e.code == 403:
             print(f"Error: Authentication failed. Check your BAILIAN_TOKEN_PLAN_API_KEY.", file=sys.stderr)
@@ -442,20 +444,20 @@ def main():
         parser.print_help()
         sys.exit(EXIT_INPUT_ERROR)
 
-    # Sanitize prompt (remove control chars)
-    args.prompt = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', args.prompt)
-
     if check_prompt_injection(args.prompt):
         print(f"Warning: Proceeding with potentially adversarial prompt.", file=sys.stderr)
+
+    # Validate model (before prompt length check, since max length depends on model)
+    validate_model(args.model)
+
+    # Sanitize prompt (remove control chars) - do this BEFORE length validation
+    args.prompt = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', args.prompt)
 
     # Validate prompt length (model-specific)
     max_len = 5000 if args.model.startswith("wan2.7") else 2000
     if len(args.prompt) < 1 or len(args.prompt) > max_len:
         print(f"Error: Prompt must be 1-{max_len} characters for {args.model} (got {len(args.prompt)})", file=sys.stderr)
         sys.exit(EXIT_INPUT_ERROR)
-
-    # Validate model
-    validate_model(args.model)
 
     # Validate size
     validate_size(args.size, args.model)

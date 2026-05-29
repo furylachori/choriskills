@@ -9,16 +9,16 @@ Generate videos from text prompts or images using the MiniMax API.
 export MINIMAX_API_KEY="your-key-here"
 
 # Generate a video (async — returns task ID)
-python minimax_video.py generate --prompt "A serene lake at sunset with birds flying"
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py generate --prompt "A serene lake at sunset with birds flying"
 
 # Wait for completion and download
-python minimax_video.py generate --prompt "Ocean waves crashing" --sync
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py generate --prompt "Ocean waves crashing" --sync
 
 # Image-to-video
-python minimax_video.py generate --prompt "The cat walking gracefully" --input-image cat.png
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/minimax_video.py generate --prompt "The cat walking gracefully" --input-image cat.png
 
 # Or use the standardized entry point
-python main.py generate --prompt "A serene lake at sunset" --sync
+python3 $HOME/.zeroclaw/workspace/skills/minimax-video/main.py generate --prompt "A serene lake at sunset" --sync
 ```
 
 ## Validation

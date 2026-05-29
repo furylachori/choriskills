@@ -9,10 +9,10 @@ Generate and edit images using StepFun's Image API.
 export STEPFUN_API_KEY="your-key-here"
 
 # Generate an image
-python stepfun_image.py generate --prompt "A cat in a hat"
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-image/stepfun_image.py generate --prompt "A cat in a hat"
 
 # Or use the standardized entry point
-python main.py generate --prompt "A cat in a hat"
+python3 $HOME/.zeroclaw/workspace/skills/stepfun-image/main.py generate --prompt "A cat in a hat"
 ```
 
 ## Validation
