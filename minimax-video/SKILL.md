@@ -11,9 +11,9 @@ Generate videos from text prompts or images using the MiniMax API.
 
 > **Read these before generating any video.**
 
-1. **NEVER reuse images from previous requests.** If the user sends a new image, use THAT image. Do not use an image from a previous conversation or request.
+1. **NEVER assume which image to use.** If the user sends a new image, use THAT image. If they don't send an image, ASK which one to use. Never carry over an image from a previous request without explicit confirmation.
 
-2. **ALWAYS confirm the image path before generating I2V.** Tell the user: "I will generate a video using [image path] — is this correct?" Wait for confirmation before proceeding.
+2. **ALWAYS confirm before generating I2V.** Tell the user: "I will generate a video using [image path] — is this correct?" Wait for confirmation before proceeding.
 
 3. **Report the task ID immediately.** Do not wait for the video to complete. Tell the user: "Your video is being generated. Task ID: [id]. Ask me for it in ~5 minutes."
 
@@ -76,9 +76,13 @@ python minimax_video.py retrieve --task-id abc123xyz --sync
 5. Report the task ID: "Your video is being generated. Task ID: [id]. Ask me for it in ~5 minutes."
 6. When user asks for video → use `retrieve --task-id <id>`
 
+**If the user asks for multiple videos from the same image:**
+- Confirm each time: "Using [image path] again for this video, correct?"
+- This prevents accidentally using a stale image from a different request
+
 **NEVER:**
-- Reuse an image from a previous request
-- Assume which image the user wants
+- Assume which image the user wants without asking
+- Carry over an image from a previous request without confirmation
 - Wait for the video to complete (use async by default)
 - Use `send_message` to report results
 
