@@ -1,0 +1,84 @@
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <STEPFUN_API_KEY> [--bailian-key <KEY>] [--minimax-key <KEY>]"
+    exit 1
+fi
+
+STEPFUN_API_KEY="$1"
+shift
+
+BAILIAN_API_KEY=""
+MINIMAX_API_KEY=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --bailian-key) BAILIAN_API_KEY="$2"; shift 2 ;;
+        --minimax-key) MINIMAX_API_KEY="$2"; shift 2 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+done
+
+REPO_URL="https://github.com/furylachori/choriskills.git"
+CLONE_DIR="$HOME/.choriskills"
+STEPFUN_SKILLS=("stepfun-image" "stepfun-tts" "stepfun-asr")
+BAILIAN_SKILLS=("bailian-image")
+MINIMAX_SKILLS=("minimax-video")
+
+echo "==> Cloning/updating repo..."
+if [ -d "$CLONE_DIR/.git" ]; then
+    git -C "$CLONE_DIR" pull --ff-only
+else
+    rm -rf "$CLONE_DIR"
+    git clone --depth 1 "$REPO_URL" "$CLONE_DIR"
+fi
+
+for skill in "${STEPFUN_SKILLS[@]}"; do
+    echo "==> Installing $skill..."
+    zeroclaw skills install "$CLONE_DIR/$skill"
+
+    SKILL_DIR="$HOME/.zeroclaw/workspace/skills/$skill"
+    if [ -d "$SKILL_DIR" ]; then
+        echo "STEPFUN_API_KEY=$STEPFUN_API_KEY" > "$SKILL_DIR/.env"
+        echo "    .env written to $SKILL_DIR/.env"
+    else
+        echo "    WARNING: $SKILL_DIR not found, skill may have failed to install"
+    fi
+done
+
+if [ -n "$BAILIAN_API_KEY" ]; then
+    for skill in "${BAILIAN_SKILLS[@]}"; do
+        echo "==> Installing $skill..."
+        zeroclaw skills install "$CLONE_DIR/$skill"
+
+        SKILL_DIR="$HOME/.zeroclaw/workspace/skills/$skill"
+        if [ -d "$SKILL_DIR" ]; then
+            echo "BAILIAN_TOKEN_PLAN_API_KEY=$BAILIAN_API_KEY" > "$SKILL_DIR/.env"
+            echo "    .env written to $SKILL_DIR/.env"
+        else
+            echo "    WARNING: $SKILL_DIR not found, skill may have failed to install"
+        fi
+    done
+else
+    echo "==> Skipping bailian-image (no --bailian-key provided)"
+fi
+
+if [ -n "$MINIMAX_API_KEY" ]; then
+    for skill in "${MINIMAX_SKILLS[@]}"; do
+        echo "==> Installing $skill..."
+        zeroclaw skills install "$CLONE_DIR/$skill"
+
+        SKILL_DIR="$HOME/.zeroclaw/workspace/skills/$skill"
+        if [ -d "$SKILL_DIR" ]; then
+            echo "MINIMAX_API_KEY=$MINIMAX_API_KEY" > "$SKILL_DIR/.env"
+            echo "    .env written to $SKILL_DIR/.env"
+        else
+            echo "    WARNING: $SKILL_DIR not found, skill may have failed to install"
+        fi
+    done
+else
+    echo "==> Skipping minimax-video (no --minimax-key provided)"
+fi
+
+echo "==> Done. Installed skills:"
+zeroclaw skills list

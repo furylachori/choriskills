@@ -1,0 +1,21 @@
+# Test script for stepfun-image skill
+# Runs unit tests only (no API key required)
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=========================================="
+echo "  Testing stepfun-image"
+echo "=========================================="
+echo ""
+
+PYTHONPATH="$SCRIPT_DIR:../stepfun-tts:../stepfun-asr" python3 -m pytest \
+  "$SCRIPT_DIR/../tests/test_stepfun_image.py" \
+  -v -k "not Integration"
+
+echo ""
+echo "=========================================="
+echo "  All stepfun-image tests passed!"
+echo "=========================================="
