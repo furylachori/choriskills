@@ -1,0 +1,22 @@
+#!/bin/bash
+# Test script for minimax-video skill
+# Runs unit tests only (no API key required)
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=========================================="
+echo "  Testing minimax-video"
+echo "=========================================="
+echo ""
+
+PYTHONPATH="$SCRIPT_DIR" python3 -m pytest \
+  "$SCRIPT_DIR/../tests/test_minimax_video.py" \
+  -v -k "not Integration"
+
+echo ""
+echo "=========================================="
+echo "  All minimax-video tests passed!"
+echo "=========================================="
