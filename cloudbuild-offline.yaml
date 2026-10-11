@@ -1,0 +1,20 @@
+timeout: 1200s
+
+steps:
+  - id: complete-offline-tests
+    name: python:3.13.7-slim-bookworm
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        CI_HOME="$(mktemp -d)"
+        export HOME="$CI_HOME"
+        trap 'rm -rf "$CI_HOME"' EXIT
+        python3 --version
+        python3 -m pip install --disable-pip-version-check --no-cache-dir pytest==8.4.2
+        python3 -m compileall -q .
+        bash TEST_ALL
+    timeout: 1080s
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,4 +1,5 @@
-# Run all unit tests for the entire claw-skills repository
+#!/usr/bin/env bash
+# Run all offline unit tests for the entire claw-skills repository.
 
 set -e
 
@@ -10,8 +11,11 @@ echo "  Testing all claw-skills"
 echo "=========================================="
 echo ""
 
-PYTHONPATH="stepfun-tts:stepfun-asr:stepfun-image:bailian-image:minimax-video" python3 -m pytest \
-  tests/ -v -m "not integration"
+PYTHONPATH="bailian-qwen-image:bailian-wan-image:minimax-video:stepfun-tts:stepfun-asr:stepfun-image" python3 -m pytest \
+  tests/ \
+  bailian-qwen-image/tests/ \
+  bailian-wan-image/tests/ \
+  -v -m "not integration"
 
 echo ""
 echo "=========================================="

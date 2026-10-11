@@ -1,0 +1,13 @@
+# Cloud Build checks
+
+`cloudbuild.yaml` is the fast PR profile. It uses the pinned Python 3.13.7 Bookworm container and pytest 8.4.2, compiles the repository's Python files, and runs the existing top-level tests under `tests/` for the StepFun and MiniMax skills. It deselects tests marked `integration` and reserves the two Bailian test directories for the fuller profile.
+
+`cloudbuild-offline.yaml` is the fuller provider-free profile intended for a separately configured 06:00 and 18:00 America/Costa_Rica run. It compiles all Python files and runs `TEST_ALL`, including tests under `bailian-qwen-image/tests/` and `bailian-wan-image/tests/` as well as `tests/`. The `integration` marker excludes the real StepFun image generation/editing and text-to-speech API tests. The remaining tests use mocks, fixtures, or local file operations; no provider credentials are set, and the profiles configure no artifacts or deployments.
+
+Both profiles install the pinned pytest release into the version-pinned runtime image, give tests a temporary writable home, preserve command failures, use bounded build and step timeouts, and store logs only in Cloud Logging. A clean build downloads pytest from PyPI; “offline” here means the test suite excludes real provider calls, not that build dependency installation has no network access.
+
+## Cloud Build identities
+
+These repository files select no service account and create no trigger or schedule. The external trigger configuration should use the existing `ci-pr-smoke` account as its build execution identity after validation against the actual build path. The identity that invokes the trigger is separate and must be authorized separately for the specific trigger. The build account's Logs Writer and custom `cloudbuild.builds.create` permission do not establish trigger invoker access. Do not grant broad project roles or unconditional self-impersonation. See Google's [Cloud Build service account guidance](https://docs.cloud.google.com/build/docs/cloud-build-service-account) and [user-managed service account guidance](https://docs.cloud.google.com/build/docs/securing-builds/configure-user-specified-service-accounts).
+
+The external trigger and schedule setup is intended for project `project-33a976dd-e360-4c43-8d9`, region `northamerica-south1`, and connection `mex`. No Cloud Build project settings, IAM, APIs, triggers, or schedules are changed here.
