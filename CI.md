@@ -4,7 +4,7 @@
 
 `cloudbuild-offline.yaml` is the fuller provider-free profile intended for a separately configured 06:00 and 18:00 America/Costa_Rica run. It compiles all Python files and runs `TEST_ALL`, including tests under `bailian-qwen-image/tests/` and `bailian-wan-image/tests/` as well as `tests/`. The `integration` marker excludes the real StepFun image generation/editing and text-to-speech API tests. The remaining tests use mocks, fixtures, or local file operations; no provider credentials are set, and the profiles configure no artifacts or deployments.
 
-Both profiles install the pinned pytest release into the version-pinned runtime image, give tests a temporary writable home, preserve command failures, use bounded build and step timeouts, and store logs only in Cloud Logging. A clean build downloads pytest from PyPI; “offline” here means the test suite excludes real provider calls, not that build dependency installation has no network access.
+Both profiles install the pinned pytest release as root into the version-pinned runtime image, then make the checkout and temporary writable home accessible to `nobody` and run compilation and tests as that non-root user. This preserves permission-sensitive write-failure coverage while keeping dependency installation separate from test privileges. The shell variables in Cloud Build arguments use escaped dollar signs so Cloud Build leaves their expansion to Bash. The profiles preserve command failures, use bounded build and step timeouts, and store logs only in Cloud Logging. A clean build downloads pytest from PyPI; “offline” here means the test suite excludes real provider calls, not that build dependency installation has no network access.
 
 ## Cloud Build identities
 

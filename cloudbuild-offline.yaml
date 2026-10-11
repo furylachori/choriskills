@@ -8,12 +8,15 @@ steps:
       - -ceu
       - |
         CI_HOME="$(mktemp -d)"
-        export HOME="$CI_HOME"
-        trap 'rm -rf "$CI_HOME"' EXIT
+        chown nobody:nogroup "$$CI_HOME"
+        chown -R nobody:nogroup /workspace
+        export HOME="$$CI_HOME"
+        trap 'rm -rf "$$CI_HOME"' EXIT
         python3 --version
         python3 -m pip install --disable-pip-version-check --no-cache-dir pytest==8.4.2
-        python3 -m compileall -q .
-        bash TEST_ALL
+        runuser -u nobody -- id
+        runuser -u nobody -- env HOME="$$CI_HOME" python3 -m compileall -q .
+        runuser -u nobody -- env HOME="$$CI_HOME" bash TEST_ALL
     timeout: 1080s
 
 options:
