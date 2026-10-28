@@ -24,10 +24,12 @@ Environment:
 
 import argparse
 import base64
+import http.client
 import ipaddress
 import json
 import os
 import re
+import shlex
 import socket
 import sys
 import tempfile
@@ -224,8 +226,10 @@ def validate_url_safe(url):
         pass  # Let the connection fail naturally — can't SSRF if we can't resolve
 
 
-def _urlopen_with_retry(req, timeout, max_retries=2, opener=None):
-    """Open URL with retry logic for transient failures."""
+def _urlopen_read_with_retry(req, timeout, max_retries=2, opener=None):
+    """Retry transient failures only for safe, read-only requests."""
+    if req.get_method() not in ("GET", "HEAD"):
+        raise ValueError("Automatic retries are only allowed for GET and HEAD requests")
     for attempt in range(max_retries + 1):
         try:
             return opener.open(req, timeout=timeout) if opener else urllib.request.urlopen(req, timeout=timeout)
@@ -270,14 +274,14 @@ def download_url(url, output_path, timeout=HTTP_TIMEOUT):
         opener = urllib.request.build_opener(_NoRedirectHandler)
         req = urllib.request.Request(url, headers={"User-Agent": "claw-skills/1.0"})
         try:
-            response = _urlopen_with_retry(req, timeout=timeout, opener=opener)
+            response = _urlopen_read_with_retry(req, timeout=timeout, opener=opener)
         except urllib.error.HTTPError as e:
             if e.code in (301, 302, 303, 307, 308):
                 redirect_url = e.headers.get('Location')
                 if redirect_url:
                     validate_url_safe(redirect_url)
                     req2 = urllib.request.Request(redirect_url, headers={"User-Agent": "claw-skills/1.0"})
-                    response = _urlopen_with_retry(req2, timeout=timeout, opener=opener)
+                    response = _urlopen_read_with_retry(req2, timeout=timeout, opener=opener)
                 else:
                     raise
             else:
@@ -355,8 +359,22 @@ def check_prompt_injection(text):
     return False
 
 
+def _report_task_recovery(task_id):
+    """Keep a known task usable even if a later read or download fails."""
+    print(f"Task ID: {task_id}", file=sys.stderr, flush=True)
+    print(f"Recover with: python minimax_video.py retrieve --task-id {shlex.quote(str(task_id))}",
+          file=sys.stderr, flush=True)
+
+
+def _report_submission_unknown():
+    print("Generation submission outcome is unknown; no automatic retry was made. "
+          "Do not resubmit until you have checked whether a task was created. "
+          "If you have a task ID, use retrieve --task-id <id> to recover.",
+          file=sys.stderr)
+
+
 def call_api(endpoint, data=None, method="POST", timeout=HTTP_TIMEOUT):
-    """Make an API call to MiniMax."""
+    """Make an API call; effectful submissions are sent only once."""
     if not API_KEY:
         print("Error: MINIMAX_API_KEY environment variable is not set.", file=sys.stderr)
         sys.exit(EXIT_AUTH_ERROR)
@@ -370,26 +388,51 @@ def call_api(endpoint, data=None, method="POST", timeout=HTTP_TIMEOUT):
     body = json.dumps(data).encode()
 
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    is_submission = req.get_method() not in ("GET", "HEAD")
 
     try:
-        response = _urlopen_with_retry(req, timeout=timeout)
+        # A failed submission may already have created a task. Without a provider
+        # idempotency guarantee, replaying it is unsafe even for HTTP 5xx errors.
+        if is_submission:
+            response = urllib.request.urlopen(req, timeout=timeout)
+        else:
+            response = _urlopen_read_with_retry(req, timeout=timeout)
         try:
-            return json.loads(response.read().decode())
-        except json.JSONDecodeError:
+            result = json.loads(response.read().decode())
+            if not isinstance(result, dict):
+                raise ValueError("Expected a JSON object")
+            return result
+        except ValueError:
             print(f"Error: Invalid JSON response from API", file=sys.stderr)
+            if is_submission:
+                _report_submission_unknown()
             sys.exit(EXIT_API_ERROR)
     except socket.timeout:
-        print(f"TIMEOUT: Request timed out after {timeout}s. Try again with --timeout {timeout*2}", file=sys.stderr)
+        print(f"TIMEOUT: Request timed out after {timeout}s.", file=sys.stderr)
+        if is_submission:
+            _report_submission_unknown()
         sys.exit(EXIT_NETWORK_ERROR)
     except urllib.error.HTTPError as e:
-        error_body = e.read().decode()
+        if is_submission and e.code >= 500:
+            _report_submission_unknown()
+        try:
+            error_body = e.read().decode(errors="replace")
+        except (OSError, http.client.HTTPException):
+            print(f"API Error ({e.code}): Could not read error response", file=sys.stderr)
+            sys.exit(EXIT_API_ERROR)
         if len(error_body) > 200:
             error_msg = error_body[:200] + "... (truncated)"
         else:
             error_msg = error_body
         try:
             err_json = json.loads(error_body)
+            if not isinstance(err_json, dict):
+                raise ValueError("Expected a JSON object")
+            if is_submission and err_json.get("task_id"):
+                _report_task_recovery(err_json["task_id"])
             base_resp = err_json.get("base_resp", {})
+            if not isinstance(base_resp, dict):
+                raise ValueError("Expected a base_resp object")
             status_code = base_resp.get("status_code", 0)
             status_msg = base_resp.get("status_msg", error_msg)
             if status_code == 1002:
@@ -413,15 +456,22 @@ def call_api(endpoint, data=None, method="POST", timeout=HTTP_TIMEOUT):
             elif status_code == 2049:
                 print(f"Invalid API key: {status_msg}", file=sys.stderr)
                 sys.exit(EXIT_AUTH_ERROR)
-        except (json.JSONDecodeError, KeyError):
+        except (ValueError, KeyError):
             pass
         print(f"API Error ({e.code}): {error_msg}", file=sys.stderr)
         sys.exit(EXIT_API_ERROR)
     except urllib.error.URLError as e:
         if isinstance(e.reason, socket.timeout):
-            print(f"TIMEOUT: Request timed out after {timeout}s. Try again with --timeout {timeout*2}", file=sys.stderr)
-            sys.exit(EXIT_NETWORK_ERROR)
-        print(f"API Error: {e.reason}", file=sys.stderr)
+            print(f"TIMEOUT: Request timed out after {timeout}s.", file=sys.stderr)
+        else:
+            print(f"API Error: {e.reason}", file=sys.stderr)
+        if is_submission:
+            _report_submission_unknown()
+        sys.exit(EXIT_NETWORK_ERROR)
+    except (OSError, http.client.HTTPException) as e:
+        print(f"API Error: {e}", file=sys.stderr)
+        if is_submission:
+            _report_submission_unknown()
         sys.exit(EXIT_NETWORK_ERROR)
 
 
@@ -436,7 +486,7 @@ def query_task(task_id, timeout=HTTP_TIMEOUT):
     req = urllib.request.Request(url, headers=headers, method="GET")
 
     try:
-        response = _urlopen_with_retry(req, timeout=timeout)
+        response = _urlopen_read_with_retry(req, timeout=timeout)
         try:
             return json.loads(response.read().decode())
         except json.JSONDecodeError:
@@ -472,7 +522,7 @@ def get_file_download_url(file_id, timeout=HTTP_TIMEOUT):
     req = urllib.request.Request(url, headers=headers, method="GET")
 
     try:
-        response = _urlopen_with_retry(req, timeout=timeout)
+        response = _urlopen_read_with_retry(req, timeout=timeout)
         try:
             resp_data = json.loads(response.read().decode())
             file_data = resp_data.get("file", {})
@@ -593,11 +643,18 @@ def generate_video(args):
 
     response = call_api("video_generation", data=data, timeout=args.timeout)
 
+    task_id = response.get("task_id")
     base_resp = response.get("base_resp", {})
+    if not isinstance(base_resp, dict):
+        base_resp = {}
+    if task_id and (args.sync or args.verbose or base_resp.get("status_code") != 0):
+        _report_task_recovery(task_id)
     if base_resp.get("status_code") != 0:
         status_msg = base_resp.get("status_msg", "Unknown error")
         status_code = base_resp.get("status_code")
         print(f"Error: API returned status_code {status_code}: {status_msg}", file=sys.stderr)
+        if status_code is None:
+            _report_submission_unknown()
         if status_code == 1002:
             sys.exit(EXIT_RATE_LIMIT)
         elif status_code == 1004:
@@ -612,9 +669,9 @@ def generate_video(args):
             sys.exit(EXIT_AUTH_ERROR)
         sys.exit(EXIT_API_ERROR)
 
-    task_id = response.get("task_id")
     if not task_id:
         print("Error: No task_id in response", file=sys.stderr)
+        _report_submission_unknown()
         sys.exit(EXIT_API_ERROR)
 
     if args.verbose:

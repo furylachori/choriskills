@@ -197,7 +197,8 @@ The file is saved in `$OUTPUT_DIR` (default: `~/.zeroclaw/agents/default/workspa
 - **"API key not set"** — add `MINIMAX_API_KEY` to your environment
 - **"Prompt must be 1–2000 characters"** — shorten your prompt
 - **"--model must be one of ..."** — use a supported model (e.g. `MiniMax-Hailuo-2.3`)
-- **Video generation timed out** — try again or use a shorter duration
+- **Generation submission failed or timed out** — the outcome may be unknown; do not resubmit until you have checked whether a task was created. Use `retrieve --task-id <id>` if you have a task ID. Submissions are sent once; safe reads retain bounded retries.
+- **Polling or download failed** — recover with `retrieve --task-id <id>`. Sync mode reports the task ID to stderr before polling.
 - **Rate limited** — wait ~30 seconds and retry
 
 ## Technical Reference

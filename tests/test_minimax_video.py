@@ -181,8 +181,8 @@ class TestScriptIntegration(unittest.TestCase):
 class TestErrorPath(unittest.TestCase):
     def test_http_error(self):
         import io
-        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test"}):
-            with patch("minimax_video._urlopen_with_retry", side_effect=urllib.error.HTTPError(
+        with patch("minimax_video.API_KEY", "test"):
+            with patch("minimax_video.urllib.request.urlopen", side_effect=urllib.error.HTTPError(
                 "https://api.minimax.io/v1/video_generation", 500, "Server Error", {},
                 io.BytesIO(b"Internal Server Error")
             )):
@@ -190,8 +190,8 @@ class TestErrorPath(unittest.TestCase):
                     call_api("video_generation", data={"prompt": "test"})
 
     def test_url_error(self):
-        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test"}):
-            with patch("minimax_video._urlopen_with_retry", side_effect=urllib.error.URLError("Network unreachable")):
+        with patch("minimax_video.API_KEY", "test"):
+            with patch("minimax_video.urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
                 with self.assertRaises(SystemExit):
                     call_api("video_generation", data={"prompt": "test"})
 
