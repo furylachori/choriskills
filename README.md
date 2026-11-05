@@ -128,3 +128,16 @@ pytest tests/ -v -m integration
 ## Technical Reference
 
 Full API specs, parameter details, error codes, and rate limits: [TECHNICAL_REFERENCE.md](TECHNICAL_REFERENCE.md)
+
+## Owned PR workflow skills
+
+These four companion skills coordinate a PR owner, watcher and designated cloud reviewer through the whole agreed scope:
+
+- [PR workflow contract](pr-workflow-contract/SKILL.md): shared state, provenance, deduplication and readiness certificate.
+- [PR owner follow-through](pr-owner-follow-through/SKILL.md): scoped repair and evidence loop.
+- [PR interaction watcher](pr-interaction-watcher/SKILL.md): supported events, reconciliation and owner routing.
+- [Cloud PR reviewer](cloud-pr-reviewer/SKILL.md): reviewer plus independent challenger and explicit readiness verdict.
+
+Make all four directories available together to the target agent's supported skill loader. The existing media `install` script does not install this bundle. Reading or installing these skills does not create watchers, provision storage, authorize new actions, or establish live coverage. The coordinator must reuse or register authorized supported subscriptions, verify them with the actual host tools, and record coverage limits and owner assignments. Bot-only comments and reactions may require catch-up reads rather than instant webhook delivery.
+
+The [behavioral scenarios](pr-workflow-contract/references/behavioral-scenarios.md) guide runtime validation. They are designed acceptance cases, not records of executed integration tests. A current trusted `Ready to merge / Next action: None` verdict ends a PR's repair cycle, never grants permission to merge, and must be revalidated after material changes.
