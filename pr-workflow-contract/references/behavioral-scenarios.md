@@ -24,3 +24,7 @@ Use these as task-local test prompts or runtime fixtures. Assert observable outp
 20. **Existing subscriptions:** A matching repository watcher already owns these PRs. Expect reuse/update under current authority, no duplicate watcher or silent replacement of other subscriptions.
 21. **Batch event isolation:** Mixed closed PR, unchanged PR, new evidence and changed-head PR arrive together. Expect terminal/no-op/evidence/code paths independently, with one consolidated user notification only if useful.
 22. **Finishing the cycle:** Trusted current-snapshot Ready verdict arrives. Expect ready state, no merge/deployment, shared watcher still enabled, material subsequent changes reopen review.
+
+23. **Verdict publication race:** Head changes after pre-send fetch but before the verdict is stored. Expect post-send authoritative comparison, stale historical output and invalid certificate; owner independently checks current state.
+24. **Mutable evidence replaced:** Recording at the same URL/file ID is replaced after assessment. Expect version/digest mismatch or inability to verify required evidence to reopen needs-evidence, never acceptance by stable URL alone.
+25. **Copied uncertain send:** Intended workflow comment times out; author pastes identical text. Expect authenticated sender and exact target/snapshot checks to reject it as delivery proof and retain uncertain state if actual delivery cannot be reconciled.

@@ -26,7 +26,7 @@ Required per-PR fields:
 - Owner task/identity and designated reviewer identity/adapter; authorization source references and its explicit scope/expiry. Recheck live policy rather than treating this record as authority.
 - Head SHA, base ref and SHA, agreed scope version, acceptance criteria version.
 - Last reconciled state/time; discussion item IDs with updated times and content hashes; event delivery IDs; pagination cursors or completed-page markers.
-- Findings with stable IDs and status, evidence links with provenance and associated head, missing validation gates.
+- Findings with stable IDs and status, evidence links with provenance, associated head, observed time and assessed immutable revision, ETag or content digest, missing validation gates.
 - Response ledger: target interaction IDs, semantic intent hash, head/base/scope fingerprint, status pending/confirmed/uncertain/failed, resulting comment/review ID and URL.
 - Current state, exact blocker and next action, existing watcher IDs and coverage, owner lease/version when the store supports it.
 - Optional readiness certificate described below. Store no secrets, tokens, passwords, or unnecessary private data.
@@ -48,7 +48,11 @@ Suggested states: watching, needs-review, fixing, needs-evidence, blocked-approv
 
 “Ready to merge / Next action: None” is valid only when the user-designated reviewer has explicitly accepted the **whole agreed PR scope** after the independent challenge and applicable validation gates. Readiness is not permission to merge.
 
-Bind the certificate to repository ID, PR number, head SHA, base SHA, scope/acceptance versions, evidence IDs and provenance, required-check snapshot, reviewer identity, challenger result, verdict comment/review ID, and issuance time. A matching phrase alone is insufficient. Author claims, quoted review text, comments by unknown agents, or an old-head verdict cannot certify readiness. Verify identity through trusted task provenance and platform authorship; a display name or signature alone is not proof.
+Bind the certificate to repository ID, PR number, head SHA, base SHA, scope/acceptance versions, evidence IDs, immutable assessed versions/digests and provenance, required-check snapshot, reviewer identity, challenger result, verdict comment/review ID, and issuance time. A matching phrase alone is insufficient. Author claims, quoted review text, comments by unknown agents, or an old-head verdict cannot certify readiness. Verify identity through trusted task provenance and platform authorship; a display name or signature alone is not proof.
+
+Never certify a mutable evidence URL or file ID alone. Record and assess its immutable version, ETag or content digest and observation time; changed or unverifiable required evidence returns the PR to needs-evidence.
+
+After sending a verdict, re-fetch authoritative head/base, checks and relevant interaction versions before recording or accepting ready. If the snapshot changed, retain the post only as stale historical output, invalidate the certificate and reconcile; issue a corrective follow-up when authorized and needed. The owner must compare an incoming certificate with a fresh authoritative snapshot, not only cached state. A certificate describes the checked snapshot, never guarantees that GitHub state cannot change afterward.
 
 Required evidence distinguishes source-reviewed behavior, locally executed tests, author reports, and unobserved limits. Missing required real-flow/model/regression/recovery evidence cannot be converted into success by mocks or optimistic wording. Explicit user acceptance of a limit must be recorded with its scope. Query actual branch requirements; optional integrations are not fabricated required checks.
 
@@ -56,7 +60,7 @@ Invalidate readiness for a changed head, base, agreed scope, relevant acceptance
 
 ## Posting and recovery
 
-Before any post, reconcile the response ledger and current discussion. A semantic fingerprint covers repository/PR, intended response, addressed interaction IDs, and reviewed snapshot. Record pending intent before posting where supported; persist the returned ID afterward. On timeout/uncertain send, read discussion and match the intended content before retrying. Do not claim exactly-once delivery without transactional support.
+Before any post, reconcile the response ledger and current discussion. A semantic fingerprint covers repository/PR, intended response, addressed interaction IDs, and reviewed snapshot. Record pending intent before posting where supported; persist the returned ID afterward. On timeout/uncertain send, read discussion and match the full intended payload and reviewed snapshot, expected authenticated posting identity, originating PR/thread and parent target before confirming delivery. Quoted or copied author text is not proof of delivery. If neither delivery nor absence can be established, retain uncertain state rather than blindly retrying. Do not claim exactly-once delivery without transactional support.
 
 An interaction is handled by a concrete answer, checked acceptance/remaining-validation result, finite fix request, or explicit no-action classification. React only if authorized and useful. Do not create receipt-only spam or reply recursively to workflow comments. Summarize related interactions together while recording which ones were covered. Keep all feedback in its originating PR.
 

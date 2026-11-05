@@ -23,6 +23,6 @@ After a fix, report the exact resulting head, what changed, what was actually ru
 
 ## Finish the whole assignment
 
-Request `cloud-pr-reviewer` review and independent challenge for the complete agreed scope. A sub-fix is not completion. Do not label Next action None when implementation, required checks or acceptance evidence remains. Stop active repair only on a verified current reviewer verdict `Ready to merge / Next action: None`, or when the PR is closed/merged, the user cancels, or a genuine permission/input blocker requires a pause. Closed/merged is terminal but does not imply validated readiness.
+Request `cloud-pr-reviewer` review and independent challenge for the complete agreed scope. A sub-fix is not completion. Do not label Next action None when implementation, required checks or acceptance evidence remains. Compare each incoming certificate with a fresh authoritative head/base/check/evidence snapshot before accepting it. Stop active repair only on a verified current reviewer verdict `Ready to merge / Next action: None`, or when the PR is closed/merged, the user cancels, or a genuine permission/input blocker requires a pause. Closed/merged is terminal but does not imply validated readiness.
 
 Readiness never authorizes merge or deployment. Keep the repository watcher available and invalidate readiness on material head/base/scope/evidence changes. Surface meaningful completion or a decision needed; avoid receipt-only updates.
